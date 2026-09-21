@@ -38,3 +38,17 @@ data class FocusSessionEntity(
     val xpEarned: Int = 0,
     val timestamp: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "user_settings")
+data class UserSettingsEntity(
+    @PrimaryKey val id: Int = 1,
+    val dailyTargetMinutes: Int = 180,
+    val defaultFocusDurationMinutes: Int = 45,
+    val strictModeEnabled: Boolean = false,
+    val soundChimeEnabled: Boolean = true,
+    val sanskritMantrasEnabled: Boolean = true,
+    val keepScreenOn: Boolean = true,
+    val activeGoalId: Long? = null,
+    val is24HourFormat: Boolean = false
+)
+

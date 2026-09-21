@@ -61,7 +61,7 @@ fun BlockedAppWarningDialog(
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "You are currently in Tapasya Mode for:",
+                    text = "You are currently in Kendrīkaraṇa Mode for:",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -74,12 +74,17 @@ fun BlockedAppWarningDialog(
                 )
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
-                    text = "${app.label} is not permitted during this deep focus session. Opening it will be recorded as an interruption.",
+                    text = "${app.label} is not permitted during this deep concentration session. Opening it will be recorded as an interruption.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                com.example.ui.components.BkpWatermark(subtle = true)
             }
         },
+
         confirmButton = {
             Button(
                 onClick = onBackToFocus,

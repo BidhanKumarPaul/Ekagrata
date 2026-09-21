@@ -83,7 +83,7 @@ fun SessionCompletedDialog(
                 )
 
                 Text(
-                    text = "Tapasya Accomplished",
+                    text = "Kendrīkaraṇa Accomplished (केन्द्रीकरण)",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -184,6 +184,10 @@ fun SessionCompletedDialog(
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                com.example.ui.components.BkpWatermark(subtle = true)
             }
         },
         confirmButton = {
@@ -199,9 +203,10 @@ fun SessionCompletedDialog(
                     contentColor = DeepObsidian
                 )
             ) {
-                Text("Return to Launcher", fontWeight = FontWeight.Bold)
+                Text("Return to Dashboard", fontWeight = FontWeight.Bold)
             }
         },
+
         dismissButton = null
     )
 }

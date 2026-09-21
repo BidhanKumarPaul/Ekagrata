@@ -1,6 +1,7 @@
 package com.example
 
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -20,10 +22,11 @@ import com.example.ui.AppDrawerSheet
 import com.example.ui.BlockedAppWarningDialog
 import com.example.ui.CreateGoalDialog
 import com.example.ui.HomeScreen
+import com.example.ui.KendrikaranaActiveScreen
+import com.example.ui.KendrikaranaDialog
 import com.example.ui.LauncherViewModel
 import com.example.ui.SessionCompletedDialog
-import com.example.ui.TapasyaActiveScreen
-import com.example.ui.TapasyaDialog
+import com.example.ui.SettingsScreen
 import com.example.ui.theme.EkagrataTheme
 
 class MainActivity : ComponentActivity() {
@@ -36,7 +39,10 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             EkagrataTheme {
-                EkagrataApp(viewModel = viewModel)
+                EkagrataApp(
+                    activity = this,
+                    viewModel = viewModel
+                )
             }
         }
     }
@@ -50,26 +56,71 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EkagrataApp(viewModel: LauncherViewModel) {
+fun EkagrataApp(
+    activity: ComponentActivity,
+    viewModel: LauncherViewModel
+) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val drawerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Back handling for Android Launcher:
-    // Close drawer if open, otherwise consume back to keep launcher stable
-    BackHandler(enabled = uiState.isAppDrawerOpen) {
+    // Handle Keep Screen Awake during Kendrīkaraṇa if enabled in Settings
+    val isFocusActive = uiState.activeSession is ActiveSessionState.Active
+    val keepAwakeEnabled = uiState.userSettings.keepScreenOn
+    DisposableEffect(isFocusActive, keepAwakeEnabled) {
+        if (isFocusActive && keepAwakeEnabled) {
+            activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
+    // Back navigation handling:
+    // Settings -> closes to Dashboard
+    // Drawer -> closes to Dashboard
+    BackHandler(enabled = uiState.isSettingsOpen) {
+        viewModel.toggleSettings(false)
+    }
+
+    BackHandler(enabled = uiState.isAppDrawerOpen && !uiState.isSettingsOpen) {
         viewModel.toggleAppDrawer(false)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Main Home Screen
+        // Main Dashboard: At the beginning, the dashboard is always at the starting point
         HomeScreen(
             uiState = uiState,
-            onStartTapasyaClick = { viewModel.toggleTapasyaSetup(true) },
+            onStartKendrikaranaClick = { viewModel.toggleKendrikaranaSetup(true) },
+            onOpenSettingsClick = { viewModel.toggleSettings(true) },
             onOpenDrawerClick = { viewModel.toggleAppDrawer(true) },
             onAppClick = { app -> viewModel.onAppClicked(context, app) },
             onCreateGoalClick = { viewModel.toggleCreateGoal(true) }
         )
+
+        // Settings Screen
+        if (uiState.isSettingsOpen) {
+            SettingsScreen(
+                currentSettings = uiState.userSettings,
+                goals = uiState.allGoals,
+                allowedAppsCount = uiState.allowedFocusApps.size,
+                totalAppsCount = uiState.allApps.size,
+                onSaveSettings = { updatedSettings ->
+                    viewModel.saveUserSettings(updatedSettings)
+                },
+                onOpenAppDrawer = {
+                    viewModel.toggleAppDrawer(true)
+                },
+                onBackToDashboard = {
+                    viewModel.toggleSettings(false)
+                },
+                onResetDefaults = {
+                    viewModel.resetUserSettings()
+                }
+            )
+        }
 
         // App Drawer Sheet
         if (uiState.isAppDrawerOpen) {
@@ -90,28 +141,30 @@ fun EkagrataApp(viewModel: LauncherViewModel) {
             )
         }
 
-        // Tapasya Setup Dialog
-        if (uiState.isTapasyaSetupOpen) {
-            TapasyaDialog(
+        // Kendrīkaraṇa Setup Dialog
+        if (uiState.isKendrikaranaSetupOpen) {
+            KendrikaranaDialog(
                 activeGoal = uiState.activeGoal,
                 goals = uiState.allGoals,
                 allowedApps = uiState.allowedFocusApps,
                 totalAppsCount = uiState.allApps.size,
+                defaultMinutes = uiState.userSettings.defaultFocusDurationMinutes,
                 onStart = { goalId, goalTitle, duration, mode ->
-                    viewModel.startTapasya(goalId, goalTitle, duration, mode)
+                    viewModel.startKendrikarana(goalId, goalTitle, duration, mode)
                 },
-                onDismiss = { viewModel.toggleTapasyaSetup(false) }
+                onDismiss = { viewModel.toggleKendrikaranaSetup(false) }
             )
         }
 
-        // Fullscreen Active Tapasya Mode
+        // Fullscreen Active Kendrīkaraṇa Mode
         val activeSession = uiState.activeSession
         if (activeSession is ActiveSessionState.Active) {
-            TapasyaActiveScreen(
+            KendrikaranaActiveScreen(
                 session = activeSession,
                 allowedApps = uiState.allowedFocusApps,
+                showSanskritMantras = uiState.userSettings.sanskritMantrasEnabled,
                 onTogglePause = { viewModel.togglePauseResume() },
-                onEmergencyExit = { viewModel.cancelTapasya() },
+                onEmergencyExit = { viewModel.cancelKendrikarana() },
                 onAppClick = { app -> viewModel.onAppClicked(context, app) }
             )
         }
@@ -145,9 +198,3 @@ fun EkagrataApp(viewModel: LauncherViewModel) {
         }
     }
 }
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    androidx.compose.material3.Text(text = "Hello $name!", modifier = modifier)
-}
-

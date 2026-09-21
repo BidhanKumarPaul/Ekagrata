@@ -141,41 +141,54 @@ class AppRepository(
 
     suspend fun toggleFavorite(packageName: String) = withContext(ioDispatcher) {
         val current = preferenceDao.getPreference(packageName)
-        val newFav = !(current?.isFavorite ?: false)
-        if (current == null) {
-            preferenceDao.upsertPreference(AppPreferenceEntity(packageName = packageName, isFavorite = newFav))
-        } else {
-            preferenceDao.updateFavorite(packageName, newFav)
-        }
+        val defaultCategory = guessCategory(packageName, "")
+        val defaultEssential = defaultCategory == AppCategory.ESSENTIAL
+        val defaultAllowed = defaultCategory == AppCategory.ESSENTIAL || defaultCategory == AppCategory.STUDY
+
+        val updated = AppPreferenceEntity(
+            packageName = packageName,
+            isFavorite = !(current?.isFavorite ?: false),
+            isAllowedInFocus = current?.isAllowedInFocus ?: defaultAllowed,
+            isEssential = current?.isEssential ?: defaultEssential,
+            customCategory = current?.customCategory
+        )
+        preferenceDao.upsertPreference(updated)
     }
 
     suspend fun toggleAllowedInFocus(packageName: String) = withContext(ioDispatcher) {
         val current = preferenceDao.getPreference(packageName)
         val defaultCategory = guessCategory(packageName, "")
+        val defaultEssential = defaultCategory == AppCategory.ESSENTIAL
         val defaultAllowed = defaultCategory == AppCategory.ESSENTIAL || defaultCategory == AppCategory.STUDY
         val currentAllowed = current?.isAllowedInFocus ?: defaultAllowed
-        val newAllowed = !currentAllowed
 
-        if (current == null) {
-            preferenceDao.upsertPreference(AppPreferenceEntity(packageName = packageName, isAllowedInFocus = newAllowed))
-        } else {
-            preferenceDao.updateAllowedInFocus(packageName, newAllowed)
-        }
+        val updated = AppPreferenceEntity(
+            packageName = packageName,
+            isFavorite = current?.isFavorite ?: false,
+            isAllowedInFocus = !currentAllowed,
+            isEssential = current?.isEssential ?: defaultEssential,
+            customCategory = current?.customCategory
+        )
+        preferenceDao.upsertPreference(updated)
     }
 
     suspend fun toggleEssential(packageName: String) = withContext(ioDispatcher) {
         val current = preferenceDao.getPreference(packageName)
         val defaultCategory = guessCategory(packageName, "")
         val defaultEssential = defaultCategory == AppCategory.ESSENTIAL
+        val defaultAllowed = defaultCategory == AppCategory.ESSENTIAL || defaultCategory == AppCategory.STUDY
         val currentEssential = current?.isEssential ?: defaultEssential
-        val newEssential = !currentEssential
 
-        if (current == null) {
-            preferenceDao.upsertPreference(AppPreferenceEntity(packageName = packageName, isEssential = newEssential))
-        } else {
-            preferenceDao.updateEssential(packageName, newEssential)
-        }
+        val updated = AppPreferenceEntity(
+            packageName = packageName,
+            isFavorite = current?.isFavorite ?: false,
+            isAllowedInFocus = current?.isAllowedInFocus ?: defaultAllowed,
+            isEssential = !currentEssential,
+            customCategory = current?.customCategory
+        )
+        preferenceDao.upsertPreference(updated)
     }
+
 
     private fun guessCategory(packageName: String, label: String): AppCategory {
         val p = packageName.lowercase()

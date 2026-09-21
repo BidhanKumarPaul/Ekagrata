@@ -9,15 +9,18 @@ import androidx.room.RoomDatabase
     entities = [
         AppPreferenceEntity::class,
         GoalEntity::class,
-        FocusSessionEntity::class
+        FocusSessionEntity::class,
+        UserSettingsEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class EkagrataDatabase : RoomDatabase() {
     abstract fun appPreferenceDao(): AppPreferenceDao
     abstract fun goalDao(): GoalDao
     abstract fun focusSessionDao(): FocusSessionDao
+    abstract fun userSettingsDao(): UserSettingsDao
+
 
     companion object {
         @Volatile

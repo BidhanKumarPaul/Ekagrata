@@ -233,9 +233,21 @@ fun AppDrawerSheet(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                com.example.ui.components.BkpWatermark(subtle = true)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
+
 
 @Composable
 fun AppDrawerItem(

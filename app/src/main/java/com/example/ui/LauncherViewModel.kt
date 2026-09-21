@@ -5,14 +5,17 @@ import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.EkagrataDatabase
+import com.example.data.local.UserSettingsEntity
 import com.example.data.repository.AppRepository
 import com.example.data.repository.FocusSessionRepository
 import com.example.data.repository.GoalRepository
+import com.example.data.repository.SettingsRepository
 import com.example.model.AppCategory
 import com.example.model.AppInfo
 import com.example.model.FocusMode
 import com.example.model.FocusSession
 import com.example.model.Goal
+import com.example.util.MindfulChimeHelper
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,8 +50,10 @@ data class LauncherUiState(
     val searchQuery: String = "",
     val selectedCategory: AppCategory = AppCategory.ALL,
     val isAppDrawerOpen: Boolean = false,
-    val isTapasyaSetupOpen: Boolean = false,
+    val isKendrikaranaSetupOpen: Boolean = false,
+    val isSettingsOpen: Boolean = false,
     val isCreateGoalOpen: Boolean = false,
+    val userSettings: UserSettingsEntity = UserSettingsEntity(),
     val activeGoal: Goal? = null,
     val allGoals: List<Goal> = emptyList(),
     val allApps: List<AppInfo> = emptyList(),
@@ -67,6 +72,7 @@ private data class BaseData(
     val apps: List<AppInfo> = emptyList(),
     val goals: List<Goal> = emptyList(),
     val activeGoal: Goal? = null,
+    val userSettings: UserSettingsEntity = UserSettingsEntity(),
     val todayMinutes: Int = 0,
     val totalXp: Int = 0
 )
@@ -75,7 +81,8 @@ private data class UiControls(
     val searchQuery: String = "",
     val selectedCategory: AppCategory = AppCategory.ALL,
     val isAppDrawerOpen: Boolean = false,
-    val isTapasyaSetupOpen: Boolean = false,
+    val isKendrikaranaSetupOpen: Boolean = false,
+    val isSettingsOpen: Boolean = false,
     val isCreateGoalOpen: Boolean = false,
     val activeSession: ActiveSessionState = ActiveSessionState.Idle,
     val blockedAppWarning: AppInfo? = null
@@ -87,6 +94,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val appRepository = AppRepository(application, database.appPreferenceDao())
     val goalRepository = GoalRepository(database.goalDao())
     val focusSessionRepository = FocusSessionRepository(database.focusSessionDao())
+    val settingsRepository = SettingsRepository(database.userSettingsDao())
 
     private val uiControls = MutableStateFlow(UiControls())
 
@@ -99,23 +107,41 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    private val sessionsStatsFlow = combine(
+        focusSessionRepository.getTodaySessions(),
+        focusSessionRepository.allSessions
+    ) { todaySessions, allSessions ->
+        val todayMins = todaySessions.sumOf { it.actualMinutes }
+        val xp = allSessions.sumOf { it.xpEarned }
+        Pair(todayMins, xp)
+    }
+
     private val baseDataFlow = combine(
         appRepository.appsFlow,
         goalRepository.allGoals,
         goalRepository.activeGoal,
-        focusSessionRepository.getTodaySessions(),
-        focusSessionRepository.allSessions
-    ) { apps, goals, activeGoal, todaySessions, allSessions ->
-        val todayMins = todaySessions.sumOf { it.actualMinutes }
-        val xp = allSessions.sumOf { it.xpEarned }
+        settingsRepository.settingsFlow,
+        sessionsStatsFlow
+    ) { apps, goals, activeGoalFromDao, settings, sessionStats ->
+        val (todayMins, xp) = sessionStats
+
+        // Find user-selected active goal if set in settings, otherwise DAO's active goal
+        val resolvedActiveGoal = if (settings.activeGoalId != null) {
+            goals.firstOrNull { it.id == settings.activeGoalId } ?: activeGoalFromDao ?: goals.firstOrNull()
+        } else {
+            activeGoalFromDao ?: goals.firstOrNull()
+        }
+
         BaseData(
             apps = apps,
             goals = goals,
-            activeGoal = activeGoal ?: goals.firstOrNull(),
-            todayMinutes = if (todayMins > 0) todayMins else 222,
+            activeGoal = resolvedActiveGoal,
+            userSettings = settings,
+            todayMinutes = if (todayMins > 0) todayMins else 180,
             totalXp = if (xp > 0) xp else 450
         )
     }
+
 
     val uiState: StateFlow<LauncherUiState> = combine(baseDataFlow, uiControls) { data, controls ->
         val query = controls.searchQuery.trim().lowercase()
@@ -141,8 +167,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             searchQuery = controls.searchQuery,
             selectedCategory = controls.selectedCategory,
             isAppDrawerOpen = controls.isAppDrawerOpen,
-            isTapasyaSetupOpen = controls.isTapasyaSetupOpen,
+            isKendrikaranaSetupOpen = controls.isKendrikaranaSetupOpen,
+            isSettingsOpen = controls.isSettingsOpen,
             isCreateGoalOpen = controls.isCreateGoalOpen,
+            userSettings = data.userSettings,
             activeGoal = data.activeGoal,
             allGoals = data.goals,
             allApps = data.apps,
@@ -179,12 +207,28 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun toggleTapasyaSetup(open: Boolean) {
-        uiControls.update { it.copy(isTapasyaSetupOpen = open) }
+    fun toggleKendrikaranaSetup(open: Boolean) {
+        uiControls.update { it.copy(isKendrikaranaSetupOpen = open) }
+    }
+
+    fun toggleSettings(open: Boolean) {
+        uiControls.update { it.copy(isSettingsOpen = open) }
     }
 
     fun toggleCreateGoal(open: Boolean) {
         uiControls.update { it.copy(isCreateGoalOpen = open) }
+    }
+
+    fun saveUserSettings(settings: UserSettingsEntity) {
+        viewModelScope.launch {
+            settingsRepository.saveSettings(settings)
+        }
+    }
+
+    fun resetUserSettings() {
+        viewModelScope.launch {
+            settingsRepository.resetToDefaults()
+        }
     }
 
     fun toggleFavorite(packageName: String) {
@@ -220,6 +264,14 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun confirmLaunchBlockedApp(context: Context, app: AppInfo) {
         val session = uiControls.value.activeSession
+        val settings = uiState.value.userSettings
+
+        // In Strict Mode, do not permit bypass
+        if (settings.strictModeEnabled) {
+            uiControls.update { it.copy(blockedAppWarning = null) }
+            return
+        }
+
         if (session is ActiveSessionState.Active) {
             uiControls.update {
                 it.copy(
@@ -251,8 +303,14 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun startTapasya(goalId: Long?, goalTitle: String, durationMinutes: Int, mode: FocusMode) {
+    fun startKendrikarana(goalId: Long?, goalTitle: String, durationMinutes: Int, mode: FocusMode) {
         val totalSecs = durationMinutes * 60
+        val settings = uiState.value.userSettings
+
+        if (settings.soundChimeEnabled) {
+            MindfulChimeHelper.playStartChime()
+        }
+
         uiControls.update {
             it.copy(
                 activeSession = ActiveSessionState.Active(
@@ -264,8 +322,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                     isPaused = false,
                     interruptionsAvoided = 0
                 ),
-                isTapasyaSetupOpen = false,
-                isAppDrawerOpen = false
+                isKendrikaranaSetupOpen = false,
+                isAppDrawerOpen = false,
+                isSettingsOpen = false
             )
         }
         startTimer()
@@ -305,7 +364,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun cancelTapasya() {
+    fun cancelKendrikarana() {
         timerJob?.cancel()
         uiControls.update { it.copy(activeSession = ActiveSessionState.Idle) }
     }
@@ -314,6 +373,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         timerJob?.cancel()
         val durationMins = (session.totalSeconds - session.remainingSeconds) / 60
         val actualMins = if (durationMins > 0) durationMins else (session.totalSeconds / 60)
+
+        val settings = uiState.value.userSettings
+        if (settings.soundChimeEnabled) {
+            MindfulChimeHelper.playCompletionChime()
+        }
 
         viewModelScope.launch {
             val xp = focusSessionRepository.recordSession(

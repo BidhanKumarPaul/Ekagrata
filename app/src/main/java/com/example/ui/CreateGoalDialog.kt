@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.BkpWatermark
 import com.example.ui.theme.AcademicIndigo
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.CardSurface
@@ -152,6 +153,10 @@ fun CreateGoalDialog(
                         )
                     )
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                BkpWatermark(subtle = true, modifier = Modifier.align(Alignment.CenterHorizontally))
             }
         },
         confirmButton = {
@@ -176,6 +181,14 @@ fun CreateGoalDialog(
                 Text("Set Goal", fontWeight = FontWeight.Bold)
             }
         },
-        dismissButton = null
+        dismissButton = {
+            androidx.compose.material3.TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     )
 }
+

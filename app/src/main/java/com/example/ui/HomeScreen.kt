@@ -78,15 +78,20 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+import androidx.compose.material.icons.filled.Settings
+import com.example.ui.components.BkpWatermark
+
 @Composable
 fun HomeScreen(
     uiState: LauncherUiState,
-    onStartTapasyaClick: () -> Unit,
+    onStartKendrikaranaClick: () -> Unit,
+    onOpenSettingsClick: () -> Unit,
     onOpenDrawerClick: () -> Unit,
     onAppClick: (AppInfo) -> Unit,
     onCreateGoalClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+
     val context = LocalContext.current
     var currentTime by remember { mutableStateOf(SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date())) }
     var currentDate by remember { mutableStateOf(SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(Date())) }
@@ -162,31 +167,54 @@ fun HomeScreen(
                     )
                 }
 
-                // XP pill
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = CardSurface,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // XP pill
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = CardSurface,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ElectricBolt,
+                                contentDescription = "XP",
+                                tint = FocusAmber,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "${uiState.totalXp} XP",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    // Settings Button
+                    IconButton(
+                        onClick = onOpenSettingsClick,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(CardSurface)
+                            .border(1.dp, CardBorder, CircleShape)
+                            .testTag("dashboard_settings_button")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.ElectricBolt,
-                            contentDescription = "XP",
-                            tint = FocusAmber,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "${uiState.totalXp} XP",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = SoftSkyBlue,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
+
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -242,9 +270,9 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Primary Call to Action: START FOCUS (Tapasya Mode)
+            // Primary Call to Action: START KENDRĪKARAṆA
             Button(
-                onClick = onStartTapasyaClick,
+                onClick = onStartKendrikaranaClick,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(60.dp)
@@ -268,13 +296,13 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(horizontalAlignment = Alignment.Start) {
                         Text(
-                            text = "START FOCUS",
+                            text = "START KENDRĪKARAṆA",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Black,
                             letterSpacing = 1.5.sp
                         )
                         Text(
-                            text = "Tapasya Deep Work Mode",
+                            text = "Kendrīkaraṇa Deep Focus Mode (केन्द्रीकरण)",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             color = DeepObsidian.copy(alpha = 0.8f)
@@ -282,6 +310,7 @@ fun HomeScreen(
                     }
                 }
             }
+
 
             Spacer(modifier = Modifier.height(28.dp))
 
@@ -351,10 +380,16 @@ fun HomeScreen(
                 )
             }
 
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Mandatory Watermark prominently placed on Dashboard
+            BkpWatermark(asPill = true)
+
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
+
 
 @Composable
 fun ActiveGoalCard(
