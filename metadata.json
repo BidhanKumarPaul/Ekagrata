@@ -1,0 +1,7 @@
+{
+  "name": "Ekagrata",
+  "description": "Distraction-free Android launcher for deep focus, goal mastery, and intentional study.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
