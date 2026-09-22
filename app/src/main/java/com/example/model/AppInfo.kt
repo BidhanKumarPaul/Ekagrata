@@ -1,16 +1,17 @@
 package com.example.model
 
-enum class AppCategory(val displayName: String) {
-    ALL("All"),
-    ESSENTIAL("Essential"),
-    STUDY("Study"),
-    WORK("Work"),
-    COMMUNICATION("Communication"),
-    ENTERTAINMENT("Entertainment"),
-    SOCIAL("Social"),
-    GAMES("Games"),
-    OTHER("Other")
+enum class AppCategory(val displayName: String, val categoryTitle: String = displayName) {
+    ALL("All", "All"),
+    URVARA("Urvara", "Urvarā"),
+    STUDY("Study", "Study"),
+    WORK("Work", "Work"),
+    COMMUNICATION("Communication", "Communication"),
+    ENTERTAINMENT("Entertainment", "Entertainment"),
+    SOCIAL("Social", "Social"),
+    GAMES("Games", "Games"),
+    OTHER("Other", "Other")
 }
+
 
 data class AppInfo(
     val packageName: String,

@@ -65,7 +65,8 @@ data class LauncherUiState(
     val currentStreakDays: Int = 12,
     val totalXp: Int = 450,
     val activeSession: ActiveSessionState = ActiveSessionState.Idle,
-    val blockedAppWarning: AppInfo? = null
+    val blockedAppWarning: AppInfo? = null,
+    val showEndEarlyConfirmation: Boolean = false
 )
 
 private data class BaseData(
@@ -85,7 +86,8 @@ private data class UiControls(
     val isSettingsOpen: Boolean = false,
     val isCreateGoalOpen: Boolean = false,
     val activeSession: ActiveSessionState = ActiveSessionState.Idle,
-    val blockedAppWarning: AppInfo? = null
+    val blockedAppWarning: AppInfo? = null,
+    val showEndEarlyConfirmation: Boolean = false
 )
 
 class LauncherViewModel(application: Application) : AndroidViewModel(application) {
@@ -151,17 +153,15 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                     app.packageName.lowercase().contains(query)
             val matchesCat = when (controls.selectedCategory) {
                 AppCategory.ALL -> true
-                AppCategory.ESSENTIAL -> app.isEssential
-                else -> app.category == controls.selectedCategory
+                AppCategory.URVARA -> app.isAllowedInFocus || app.category == AppCategory.URVARA || app.isEssential
+                else -> app.category == controls.selectedCategory && !app.isAllowedInFocus
             }
             matchesQuery && matchesCat
         }
 
         val favorites = data.apps.filter { it.isFavorite }
-        val essentials = data.apps.filter { it.isEssential }.ifEmpty {
-            data.apps.filter { it.category == AppCategory.ESSENTIAL || it.category == AppCategory.STUDY }.take(5)
-        }
-        val allowed = data.apps.filter { it.isAllowedInFocus }
+        val essentials = data.apps.filter { it.category == AppCategory.URVARA }
+        val allowed = data.apps.filter { it.category == AppCategory.URVARA && it.isAllowedInFocus }
 
         LauncherUiState(
             searchQuery = controls.searchQuery,
@@ -182,7 +182,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             currentStreakDays = 12,
             totalXp = data.totalXp,
             activeSession = controls.activeSession,
-            blockedAppWarning = controls.blockedAppWarning
+            blockedAppWarning = controls.blockedAppWarning,
+            showEndEarlyConfirmation = controls.showEndEarlyConfirmation
         )
     }.stateIn(
         scope = viewModelScope,
@@ -253,39 +254,29 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         appRepository.refreshInstalledApps()
     }
 
+    var isLaunchingAllowedApp: Boolean = false
+
     fun onAppClicked(context: Context, app: AppInfo) {
         val currentSession = uiControls.value.activeSession
-        if (currentSession is ActiveSessionState.Active && !app.isAllowedInFocus) {
-            uiControls.update { it.copy(blockedAppWarning = app) }
-            return
+        if (currentSession is ActiveSessionState.Active) {
+            val isUrvaraApp = app.category == AppCategory.URVARA && app.isAllowedInFocus
+            if (!isUrvaraApp) {
+                // Strictly block all non-Urvarā apps during Kendrīkaraṇa
+                uiControls.update { it.copy(blockedAppWarning = app) }
+                return
+            }
+            // Only genuine allowed Urvarā apps are permitted to be used in Kendrīkaraṇa mode
+            isLaunchingAllowedApp = true
         }
         appRepository.launchApp(app.packageName, app.activityName)
     }
 
     fun confirmLaunchBlockedApp(context: Context, app: AppInfo) {
-        val session = uiControls.value.activeSession
-        val settings = uiState.value.userSettings
-
-        // In Strict Mode, do not permit bypass
-        if (settings.strictModeEnabled) {
-            uiControls.update { it.copy(blockedAppWarning = null) }
-            return
-        }
-
-        if (session is ActiveSessionState.Active) {
-            uiControls.update {
-                it.copy(
-                    activeSession = session.copy(
-                        interruptionsAvoided = (session.interruptionsAvoided - 1).coerceAtLeast(0)
-                    ),
-                    blockedAppWarning = null
-                )
-            }
-        } else {
-            uiControls.update { it.copy(blockedAppWarning = null) }
-        }
-        appRepository.launchApp(app.packageName, app.activityName)
+        // Close warning and end session; do NOT launch the blocked non-Urvarā app!
+        uiControls.update { it.copy(blockedAppWarning = null) }
+        endKendrikaranaEarly()
     }
+
 
     fun dismissBlockedAppWarning() {
         val session = uiControls.value.activeSession
@@ -303,12 +294,28 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun startKendrikarana(goalId: Long?, goalTitle: String, durationMinutes: Int, mode: FocusMode) {
+    fun requestEndEarlyConfirmation(show: Boolean = true) {
+        uiControls.update { it.copy(showEndEarlyConfirmation = show) }
+    }
+
+    fun startKendrikarana(
+        goalId: Long?,
+        goalTitle: String,
+        durationMinutes: Int,
+        mode: FocusMode,
+        sessionAllowedPackageNames: Set<String>? = null
+    ) {
         val totalSecs = durationMinutes * 60
         val settings = uiState.value.userSettings
 
         if (settings.soundChimeEnabled) {
             MindfulChimeHelper.playStartChime()
+        }
+
+        if (sessionAllowedPackageNames != null) {
+            viewModelScope.launch {
+                appRepository.setAllowedApps(sessionAllowedPackageNames, uiState.value.allApps)
+            }
         }
 
         uiControls.update {
@@ -324,7 +331,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 ),
                 isKendrikaranaSetupOpen = false,
                 isAppDrawerOpen = false,
-                isSettingsOpen = false
+                isSettingsOpen = false,
+                showEndEarlyConfirmation = false
             )
         }
         startTimer()
@@ -365,14 +373,61 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun cancelKendrikarana() {
+        endKendrikaranaEarly()
+    }
+
+    fun endKendrikaranaEarly() {
+        val session = uiControls.value.activeSession
         timerJob?.cancel()
-        uiControls.update { it.copy(activeSession = ActiveSessionState.Idle) }
+        if (session is ActiveSessionState.Active) {
+            val elapsedSeconds = session.totalSeconds - session.remainingSeconds
+            val elapsedMins = (elapsedSeconds + 59) / 60
+            val actualMins = if (elapsedMins > 0) elapsedMins else 1
+            val hoursToAdd = actualMins / 60f
+
+            val settings = uiState.value.userSettings
+            if (settings.soundChimeEnabled) {
+                MindfulChimeHelper.playCompletionChime()
+            }
+
+            viewModelScope.launch {
+                focusSessionRepository.recordSession(
+                    goalId = session.goalId,
+                    goalTitle = session.goalTitle,
+                    plannedMinutes = session.totalSeconds / 60,
+                    actualMinutes = actualMins,
+                    mode = session.mode,
+                    isCompleted = false,
+                    interruptionsAvoided = session.interruptionsAvoided
+                )
+                goalRepository.addFocusHours(session.goalId, hoursToAdd)
+
+                uiControls.update {
+                    it.copy(
+                        activeSession = ActiveSessionState.Completed(
+                            goalTitle = session.goalTitle,
+                            durationMinutes = actualMins,
+                            xpEarned = 50 + (actualMins * 2),
+                            interruptionsResisted = session.interruptionsAvoided
+                        ),
+                        showEndEarlyConfirmation = false
+                    )
+                }
+            }
+        } else {
+            uiControls.update {
+                it.copy(
+                    activeSession = ActiveSessionState.Idle,
+                    showEndEarlyConfirmation = false
+                )
+            }
+        }
     }
 
     private fun completeSession(session: ActiveSessionState.Active) {
         timerJob?.cancel()
-        val durationMins = (session.totalSeconds - session.remainingSeconds) / 60
-        val actualMins = if (durationMins > 0) durationMins else (session.totalSeconds / 60)
+        val plannedMins = session.totalSeconds / 60
+        val actualMins = if (plannedMins > 0) plannedMins else 1
 
         val settings = uiState.value.userSettings
         if (settings.soundChimeEnabled) {
@@ -380,18 +435,16 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         }
 
         viewModelScope.launch {
-            val xp = focusSessionRepository.recordSession(
+            focusSessionRepository.recordSession(
                 goalId = session.goalId,
                 goalTitle = session.goalTitle,
-                plannedMinutes = session.totalSeconds / 60,
+                plannedMinutes = plannedMins,
                 actualMinutes = actualMins,
                 mode = session.mode,
                 isCompleted = true,
                 interruptionsAvoided = session.interruptionsAvoided
             )
-            session.goalId?.let { gid ->
-                goalRepository.addFocusHours(gid, actualMins / 60f)
-            }
+            goalRepository.addFocusHours(session.goalId, actualMins / 60f)
 
             uiControls.update {
                 it.copy(
@@ -400,11 +453,17 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                         durationMinutes = actualMins,
                         xpEarned = 100 + (session.interruptionsAvoided * 10),
                         interruptionsResisted = session.interruptionsAvoided
-                    )
+                    ),
+                    showEndEarlyConfirmation = false
                 )
             }
         }
     }
+
+    fun playMotivationalSound() {
+        MindfulChimeHelper.playMotivationalChime()
+    }
+
 
     fun dismissCompletedSession() {
         uiControls.update { it.copy(activeSession = ActiveSessionState.Idle) }

@@ -33,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -46,6 +47,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.model.AppCategory
 import com.example.model.AppInfo
 import com.example.model.FocusMode
 import com.example.model.Goal
@@ -65,14 +67,22 @@ fun KendrikaranaDialog(
     activeGoal: Goal?,
     goals: List<Goal>,
     allowedApps: List<AppInfo>,
+    allApps: List<AppInfo> = emptyList(),
     totalAppsCount: Int,
     defaultMinutes: Int = 45,
-    onStart: (goalId: Long?, goalTitle: String, durationMinutes: Int, mode: FocusMode) -> Unit,
+    onStart: (goalId: Long?, goalTitle: String, durationMinutes: Int, mode: FocusMode, allowedPackages: Set<String>) -> Unit,
     onDismiss: () -> Unit
 ) {
     var selectedGoal by remember { mutableStateOf(activeGoal ?: goals.firstOrNull()) }
     var selectedDuration by remember { mutableIntStateOf(defaultMinutes) }
     var selectedMode by remember { mutableStateOf(FocusMode.DEEP) }
+    val urvaraApps = remember(allApps, allowedApps) {
+        val list = if (allApps.isNotEmpty()) allApps.filter { it.category == AppCategory.URVARA } else allowedApps.filter { it.category == AppCategory.URVARA }
+        list
+    }
+    var selectedAllowedPackages by remember(urvaraApps) {
+        mutableStateOf(urvaraApps.filter { it.isAllowedInFocus }.map { it.packageName }.toSet())
+    }
 
     val durations = listOf(15, 25, 45, 50, 90, 120)
     val modes = listOf(
@@ -102,7 +112,7 @@ fun KendrikaranaDialog(
                         color = SoftSkyBlue
                     )
                     Text(
-                        text = "Distraction-Free Deep Immersion (केन्द्रीकरण)",
+                        text = "Distraction-Free Deep Focus",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -275,6 +285,39 @@ fun KendrikaranaDialog(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
+                // App Blocking Configuration Section (Urvarā)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "URVARĀ (APP BLOCKER)",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
+                        color = AcademicIndigo
+                    )
+
+                    TextButton(
+                        onClick = {
+                            selectedAllowedPackages = if (selectedAllowedPackages.isEmpty()) {
+                                allowedApps.map { it.packageName }.toSet()
+                            } else {
+                                emptySet()
+                            }
+                        }
+                    ) {
+                        Text(
+                            text = if (selectedAllowedPackages.isEmpty()) "Allow Urvarā Apps" else "Block All Apps",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (selectedAllowedPackages.isEmpty()) SoftSkyBlue else FocusAmber,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+
                 // Allowed Apps Info Banner
                 Surface(
                     modifier = Modifier
@@ -283,22 +326,69 @@ fun KendrikaranaDialog(
                         .border(1.dp, CardBorder, RoundedCornerShape(12.dp)),
                     color = CardSurface.copy(alpha = 0.6f)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Security,
-                            contentDescription = null,
-                            tint = CalmEmerald,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "${allowedApps.size} apps accessible in Kendrīkaraṇa (${totalAppsCount - allowedApps.size} non-essentials restricted)",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Security,
+                                contentDescription = null,
+                                tint = if (selectedAllowedPackages.isEmpty()) FocusAmber else CalmEmerald,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (selectedAllowedPackages.isEmpty()) {
+                                    "Strict Lockdown: ALL $totalAppsCount apps blocked from opening"
+                                } else {
+                                    "${selectedAllowedPackages.size} Urvarā apps accessible • ${totalAppsCount - selectedAllowedPackages.size} apps strictly blocked"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        // Only Urvarā apps can be toggled for Kendrīkaraṇa
+                        if (urvaraApps.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                urvaraApps.forEach { app ->
+                                    val isAllowed = selectedAllowedPackages.contains(app.packageName)
+                                    FilterChip(
+                                        selected = isAllowed,
+                                        onClick = {
+                                            selectedAllowedPackages = if (isAllowed) {
+                                                selectedAllowedPackages - app.packageName
+                                            } else {
+                                                selectedAllowedPackages + app.packageName
+                                            }
+                                        },
+                                        label = {
+                                            Text(
+                                                text = app.label,
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = if (isAllowed) Icons.Default.Security else Icons.Default.Lock,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                        },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = CalmEmerald.copy(alpha = 0.3f),
+                                            selectedLabelColor = SoftSkyBlue,
+                                            containerColor = CardSurface,
+                                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -317,7 +407,7 @@ fun KendrikaranaDialog(
             Button(
                 onClick = {
                     val title = selectedGoal?.title ?: "Unbroken Study"
-                    onStart(selectedGoal?.id, title, selectedDuration, selectedMode)
+                    onStart(selectedGoal?.id, title, selectedDuration, selectedMode, selectedAllowedPackages)
                 },
                 modifier = Modifier
                     .fillMaxWidth()

@@ -44,17 +44,27 @@ class AppRepository(
         rawApps.map { raw ->
             val pref = prefMap[raw.packageName]
             val defaultCategory = guessCategory(raw.packageName, raw.label)
-            val defaultEssential = defaultCategory == AppCategory.ESSENTIAL
-            val defaultAllowed = defaultCategory == AppCategory.ESSENTIAL || defaultCategory == AppCategory.STUDY
+
+            val parsedCategory = pref?.customCategory?.let {
+                when (it) {
+                    "URVARA", "ESSENTIAL" -> AppCategory.URVARA
+                    "PROACTIVE" -> AppCategory.WORK
+                    else -> runCatching { AppCategory.valueOf(it) }.getOrNull()
+                }
+            } ?: defaultCategory
+
+            // Strictly restrict allowed in focus to Urvarā apps only
+            val isUrvara = parsedCategory == AppCategory.URVARA
+            val isAllowed = isUrvara && (pref?.isAllowedInFocus ?: true)
 
             AppInfo(
                 packageName = raw.packageName,
                 activityName = raw.activityName,
                 label = raw.label,
                 isFavorite = pref?.isFavorite ?: false,
-                isAllowedInFocus = pref?.isAllowedInFocus ?: defaultAllowed,
-                isEssential = pref?.isEssential ?: defaultEssential,
-                category = pref?.customCategory?.let { runCatching { AppCategory.valueOf(it) }.getOrNull() } ?: defaultCategory,
+                isAllowedInFocus = isAllowed,
+                isEssential = isUrvara,
+                category = parsedCategory,
                 installTime = raw.installTime
             )
         }.sortedWith(compareBy({ !it.isFavorite }, { it.label.lowercase() }))
@@ -142,8 +152,8 @@ class AppRepository(
     suspend fun toggleFavorite(packageName: String) = withContext(ioDispatcher) {
         val current = preferenceDao.getPreference(packageName)
         val defaultCategory = guessCategory(packageName, "")
-        val defaultEssential = defaultCategory == AppCategory.ESSENTIAL
-        val defaultAllowed = defaultCategory == AppCategory.ESSENTIAL || defaultCategory == AppCategory.STUDY
+        val defaultEssential = defaultCategory == AppCategory.URVARA
+        val defaultAllowed = defaultCategory == AppCategory.URVARA
 
         val updated = AppPreferenceEntity(
             packageName = packageName,
@@ -158,16 +168,19 @@ class AppRepository(
     suspend fun toggleAllowedInFocus(packageName: String) = withContext(ioDispatcher) {
         val current = preferenceDao.getPreference(packageName)
         val defaultCategory = guessCategory(packageName, "")
-        val defaultEssential = defaultCategory == AppCategory.ESSENTIAL
-        val defaultAllowed = defaultCategory == AppCategory.ESSENTIAL || defaultCategory == AppCategory.STUDY
-        val currentAllowed = current?.isAllowedInFocus ?: defaultAllowed
+        val isUrvara = current?.customCategory == AppCategory.URVARA.name || (current?.customCategory == null && defaultCategory == AppCategory.URVARA)
+        // Only Urvarā apps are permitted to be toggled for focus mode
+        if (!isUrvara) return@withContext
+
+        val currentAllowed = current?.isAllowedInFocus ?: true
+        val nextAllowed = !currentAllowed
 
         val updated = AppPreferenceEntity(
             packageName = packageName,
             isFavorite = current?.isFavorite ?: false,
-            isAllowedInFocus = !currentAllowed,
-            isEssential = current?.isEssential ?: defaultEssential,
-            customCategory = current?.customCategory
+            isAllowedInFocus = nextAllowed,
+            isEssential = true,
+            customCategory = AppCategory.URVARA.name
         )
         preferenceDao.upsertPreference(updated)
     }
@@ -175,18 +188,34 @@ class AppRepository(
     suspend fun toggleEssential(packageName: String) = withContext(ioDispatcher) {
         val current = preferenceDao.getPreference(packageName)
         val defaultCategory = guessCategory(packageName, "")
-        val defaultEssential = defaultCategory == AppCategory.ESSENTIAL
-        val defaultAllowed = defaultCategory == AppCategory.ESSENTIAL || defaultCategory == AppCategory.STUDY
-        val currentEssential = current?.isEssential ?: defaultEssential
+        val isUrvara = current?.customCategory == AppCategory.URVARA.name || defaultCategory == AppCategory.URVARA
 
         val updated = AppPreferenceEntity(
             packageName = packageName,
             isFavorite = current?.isFavorite ?: false,
-            isAllowedInFocus = current?.isAllowedInFocus ?: defaultAllowed,
-            isEssential = !currentEssential,
+            isAllowedInFocus = current?.isAllowedInFocus ?: isUrvara,
+            isEssential = !(current?.isEssential ?: isUrvara),
             customCategory = current?.customCategory
         )
         preferenceDao.upsertPreference(updated)
+    }
+
+    suspend fun setAllowedApps(allowedPackageNames: Set<String>, allApps: List<AppInfo>) = withContext(ioDispatcher) {
+        allApps.forEach { app ->
+            val isUrvara = app.category == AppCategory.URVARA
+            // ONLY Urvarā apps can ever be allowed during Kendrīkaraṇa
+            val shouldBeAllowed = isUrvara && allowedPackageNames.contains(app.packageName)
+            val current = preferenceDao.getPreference(app.packageName)
+            preferenceDao.upsertPreference(
+                AppPreferenceEntity(
+                    packageName = app.packageName,
+                    isFavorite = current?.isFavorite ?: app.isFavorite,
+                    isAllowedInFocus = shouldBeAllowed,
+                    isEssential = if (isUrvara) (current?.isEssential ?: true) else false,
+                    customCategory = current?.customCategory ?: app.category.name
+                )
+            )
+        }
     }
 
 
@@ -195,13 +224,20 @@ class AppRepository(
         val l = label.lowercase()
 
         return when {
+            p.contains("task") || l.contains("task") ||
+            p.contains("todo") || l.contains("todo") ||
+            p.contains("habit") || l.contains("habit") ||
+            p.contains("trello") || p.contains("github") ||
+            p.contains("focus") || l.contains("focus") ||
+            p.contains("pomodoro") || l.contains("pomodoro") -> AppCategory.WORK
+
             p.contains("calc") || l.contains("calc") ||
             p.contains("clock") || l.contains("clock") ||
             p.contains("calendar") || l.contains("calendar") ||
             p.contains("notes") || l.contains("notes") ||
             p.contains("keep") || l.contains("keep") ||
             p.contains("contact") || p.contains("dialer") || p.contains("phone") ||
-            p.contains("deskclock") || p.contains("settings") -> AppCategory.ESSENTIAL
+            p.contains("deskclock") || p.contains("settings") -> AppCategory.URVARA
 
             p.contains("drive") || p.contains("doc") || p.contains("sheet") ||
             p.contains("slide") || p.contains("pdf") || p.contains("reader") ||

@@ -50,7 +50,7 @@ fun AppIconView(
     }.value
 
     val bgColor = when (category) {
-        AppCategory.ESSENTIAL -> SoftSkyBlue.copy(alpha = 0.2f)
+        AppCategory.URVARA -> SoftSkyBlue.copy(alpha = 0.2f)
         AppCategory.STUDY -> CalmEmerald.copy(alpha = 0.2f)
         AppCategory.WORK -> AcademicIndigo.copy(alpha = 0.2f)
         AppCategory.COMMUNICATION -> SoftSkyBlue.copy(alpha = 0.15f)
@@ -59,7 +59,7 @@ fun AppIconView(
     }
 
     val textColor = when (category) {
-        AppCategory.ESSENTIAL -> SoftSkyBlue
+        AppCategory.URVARA -> SoftSkyBlue
         AppCategory.STUDY -> CalmEmerald
         AppCategory.WORK -> AcademicIndigo
         else -> MaterialTheme.colorScheme.onSurface

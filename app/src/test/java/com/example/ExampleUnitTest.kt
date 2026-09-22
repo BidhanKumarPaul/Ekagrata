@@ -32,7 +32,7 @@ class ExampleUnitTest {
       packageName = "com.google.android.calculator",
       activityName = "com.google.android.calculator.Calculator",
       label = "Calculator",
-      category = AppCategory.ESSENTIAL,
+      category = AppCategory.URVARA,
       isEssential = true,
       isAllowedInFocus = true
     )

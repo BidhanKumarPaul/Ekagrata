@@ -1,5 +1,6 @@
 package com.example.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -32,6 +33,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Security
@@ -41,6 +45,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -79,19 +84,27 @@ import com.example.ui.theme.FocusAmber
 import com.example.ui.theme.FocusCrimson
 import com.example.ui.theme.SlateNavy
 import com.example.ui.theme.SoftSkyBlue
+import com.example.util.MindfulChimeHelper
 import kotlinx.coroutines.delay
 
 @Composable
 fun KendrikaranaActiveScreen(
     session: ActiveSessionState.Active,
     allowedApps: List<AppInfo>,
+    isStrictMode: Boolean = false,
     showSanskritMantras: Boolean = true,
+    hanumanChalisaEnabled: Boolean = true,
+    showExitConfirmation: Boolean = false,
+    onRequestExitConfirmation: (Boolean) -> Unit = {},
     onTogglePause: () -> Unit,
     onEmergencyExit: () -> Unit,
     onAppClick: (AppInfo) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var showExitConfirmation by remember { mutableStateOf(false) }
+    // Redirect device back button to "End Early" confirmation dialog
+    BackHandler(enabled = true) {
+        onRequestExitConfirmation(true)
+    }
 
     val remainingMinutes = session.remainingSeconds / 60
     val remainingSecs = session.remainingSeconds % 60
@@ -111,15 +124,20 @@ fun KendrikaranaActiveScreen(
         label = "pulse_scale"
     )
 
-    // Rotating Sanskrit Sutra
-    var currentSutraIndex by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(20000)
-            currentSutraIndex = (currentSutraIndex + 1) % KendrikaranaWisdom.sutras.size
+    // Mantras list including Hanuman Chalisa if enabled
+    val mantraList = remember(showSanskritMantras, hanumanChalisaEnabled) {
+        KendrikaranaWisdom.getFilteredMantras(hanumanChalisaEnabled)
+    }
+
+    var currentMantraIndex by remember { mutableIntStateOf(0) }
+    LaunchedEffect(mantraList.size) {
+        while (mantraList.isNotEmpty()) {
+            delay(15000)
+            currentMantraIndex = (currentMantraIndex + 1) % mantraList.size
         }
     }
-    val currentSutra = KendrikaranaWisdom.sutras[currentSutraIndex]
+
+    val currentMantra = mantraList.getOrNull(currentMantraIndex % mantraList.size.coerceAtLeast(1))
 
     Box(
         modifier = modifier
@@ -140,55 +158,81 @@ fun KendrikaranaActiveScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Header: Kendrīkaraṇa Mode Indicator & Watermark pill
+            // Top Bar: Shield Status & Sound Chime Button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = CardSurface,
+                    shape = RoundedCornerShape(12.dp),
+                    color = SlateNavy.copy(alpha = 0.8f),
                     border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .background(
-                                    if (session.isPaused) FocusAmber else CalmEmerald,
-                                    CircleShape
-                                )
+                        Icon(
+                            imageVector = Icons.Default.Security,
+                            contentDescription = "Shield Active",
+                            tint = CalmEmerald,
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (session.isPaused) "PAUSED" else "KENDRĪKARAṆA ACTIVE",
+                            text = "DISTRACTION SHIELD ACTIVE",
                             style = MaterialTheme.typography.labelSmall,
+                            letterSpacing = 1.2.sp,
                             fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.5.sp,
-                            color = if (session.isPaused) FocusAmber else CalmEmerald
+                            color = CalmEmerald
                         )
                     }
                 }
 
-                BkpWatermark(asPill = true)
+                // Motivational Bell Ring Button
+                IconButton(
+                    onClick = {
+                        MindfulChimeHelper.playMotivationalChime()
+                    },
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(SlateNavy.copy(alpha = 0.7f))
+                        .border(1.dp, CardBorder, CircleShape)
+                        .testTag("ring_chime_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.NotificationsActive,
+                        contentDescription = "Ring Motivation Sound",
+                        tint = FocusAmber,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
 
-            // Central Area: Goal Title, Breath Pulse Timer, Sanskrit Sutra
+            // Middle Section: Goal Title, Circular Timer, and Mantras
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = session.goalTitle,
-                    style = MaterialTheme.typography.headlineSmall,
+                    text = "KENDRĪKARAṆA",
+                    style = MaterialTheme.typography.labelSmall,
+                    letterSpacing = 3.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AcademicIndigo
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = "\"${session.goalTitle}\"",
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
@@ -196,56 +240,47 @@ fun KendrikaranaActiveScreen(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = "${session.mode.title} • Immersion",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = AcademicIndigo,
-                    letterSpacing = 1.sp
-                )
-
                 Spacer(modifier = Modifier.height(28.dp))
 
-                // Circular Timer Dial with Pranayama Pulse
+                // Circular Timer Ring with Breath Pulse
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(240.dp)
                         .scale(pulseScale)
                 ) {
-                    // Outer background ring
                     CircularProgressIndicator(
-                        progress = 1f,
+                        progress = { 1f },
                         modifier = Modifier.fillMaxSize(),
                         color = CardBorder.copy(alpha = 0.4f),
                         strokeWidth = 10.dp
                     )
 
-                    // Active progress ring
                     CircularProgressIndicator(
-                        progress = progress,
+                        progress = { progress },
                         modifier = Modifier.fillMaxSize(),
-                        color = if (session.isPaused) FocusAmber else SoftSkyBlue,
+                        color = if (session.isPaused) FocusAmber else CalmEmerald,
                         strokeWidth = 10.dp
                     )
 
-                    // Inner Timer Display
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
                         Text(
                             text = formattedTime,
-                            fontSize = 54.sp,
-                            fontWeight = FontWeight.Light,
-                            fontFamily = FontFamily.SansSerif,
+                            style = MaterialTheme.typography.displayMedium,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurface,
-                            letterSpacing = (-1).sp
+                            modifier = Modifier.testTag("kendrikarana_timer_display")
                         )
 
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
 
                         Text(
-                            text = if (session.isPaused) "TAP RESUME" else "STAY CENTERED",
-                            style = MaterialTheme.typography.labelSmall,
+                            text = if (session.isPaused) "PAUSED" else "DEEP IMMERSION",
+                            style = MaterialTheme.typography.labelMedium,
                             letterSpacing = 2.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -253,37 +288,77 @@ fun KendrikaranaActiveScreen(
                     }
                 }
 
-                // Sanskrit Wisdom Sutra Banner
-                if (showSanskritMantras) {
-                    Spacer(modifier = Modifier.height(22.dp))
+                // Sacred Focus Mantra & Hanuman Chalisa Banner
+                if (showSanskritMantras && currentMantra != null) {
+                    Spacer(modifier = Modifier.height(20.dp))
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .border(1.dp, CardBorder.copy(alpha = 0.5f), RoundedCornerShape(14.dp)),
-                        color = CardSurface.copy(alpha = 0.6f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .border(1.dp, CardBorder.copy(alpha = 0.6f), RoundedCornerShape(16.dp)),
+                        color = CardSurface.copy(alpha = 0.7f)
                     ) {
-                        AnimatedContent(
-                            targetState = currentSutra,
-                            transitionSpec = { fadeIn() togetherWith fadeOut() },
-                            label = "sutra_transition"
-                        ) { sutra ->
-                            Column(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                        Column(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                IconButton(
+                                    onClick = {
+                                        currentMantraIndex = if (currentMantraIndex - 1 < 0) mantraList.size - 1 else currentMantraIndex - 1
+                                    },
+                                    modifier = Modifier.size(26.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronLeft,
+                                        contentDescription = "Previous Mantra",
+                                        tint = SoftSkyBlue,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+
                                 Text(
-                                    text = sutra.devanagari,
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    text = currentMantra.source,
+                                    style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = SoftSkyBlue,
-                                    textAlign = TextAlign.Center
+                                    color = if (currentMantra.isHanumanChalisa) FocusAmber else AcademicIndigo
                                 )
+
+                                IconButton(
+                                    onClick = {
+                                        currentMantraIndex = (currentMantraIndex + 1) % mantraList.size
+                                    },
+                                    modifier = Modifier.size(26.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = "Next Mantra",
+                                        tint = SoftSkyBlue,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = "\"${currentMantra.meaning}\"",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = SoftSkyBlue,
+                                textAlign = TextAlign.Center
+                            )
+
+                            if (currentMantra.transliteration.isNotBlank()) {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "\"${sutra.meaning}\"",
+                                    text = currentMantra.transliteration.lines().firstOrNull() ?: "",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                     textAlign = TextAlign.Center
                                 )
                             }
@@ -297,15 +372,15 @@ fun KendrikaranaActiveScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Allowed Apps Drawer Tray
+                // Urvarā Section: Allowed Apps Tray in Kendrīkaraṇa mode
                 if (allowedApps.isNotEmpty()) {
                     Text(
-                        text = "ALLOWED TOOLS",
+                        text = "URVARĀ (ALLOWED APPS)",
                         style = MaterialTheme.typography.labelSmall,
                         letterSpacing = 1.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 10.dp)
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
 
                     LazyRow(
@@ -339,7 +414,7 @@ fun KendrikaranaActiveScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(18.dp))
                 }
 
                 // Controls: Pause / Resume & Emergency Exit
@@ -347,7 +422,6 @@ fun KendrikaranaActiveScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Pause / Resume Button
                     OutlinedButton(
                         onClick = onTogglePause,
                         modifier = Modifier
@@ -372,9 +446,8 @@ fun KendrikaranaActiveScreen(
                         )
                     }
 
-                    // Emergency Exit Button
                     Button(
-                        onClick = { showExitConfirmation = true },
+                        onClick = { onRequestExitConfirmation(true) },
                         modifier = Modifier
                             .weight(1f)
                             .height(52.dp)
@@ -386,16 +459,15 @@ fun KendrikaranaActiveScreen(
                         )
                     ) {
                         Text(
-                            text = "END EARLY",
+                            text = "END KENDRIKARANA",
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Bottom Watermark
                 BkpWatermark(subtle = true)
             }
         }
@@ -403,7 +475,7 @@ fun KendrikaranaActiveScreen(
         // Emergency Exit Confirmation Dialog
         if (showExitConfirmation) {
             AlertDialog(
-                onDismissRequest = { showExitConfirmation = false },
+                onDismissRequest = { onRequestExitConfirmation(false) },
                 containerColor = DeepObsidian,
                 icon = {
                     Icon(
@@ -415,7 +487,7 @@ fun KendrikaranaActiveScreen(
                 },
                 title = {
                     Text(
-                        text = "Break Kendrīkaraṇa?",
+                        text = "End Kendrīkaraṇa?",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -424,7 +496,7 @@ fun KendrikaranaActiveScreen(
                 text = {
                     Column {
                         Text(
-                            text = "Ending your Kendrīkaraṇa session early breaks your flow streak and forfeits bonus concentration XP.",
+                            text = "Are you sure you want to end this focus session? Your focus time accumulated so far will be saved to your active goal progress.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -435,7 +507,7 @@ fun KendrikaranaActiveScreen(
                 confirmButton = {
                     Button(
                         onClick = {
-                            showExitConfirmation = false
+                            onRequestExitConfirmation(false)
                             onEmergencyExit()
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -444,11 +516,13 @@ fun KendrikaranaActiveScreen(
                         ),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Break Focus")
+                        Text("End Session & Save Progress")
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showExitConfirmation = false }) {
+                    TextButton(
+                        onClick = { onRequestExitConfirmation(false) }
+                    ) {
                         Text("Stay Focused", color = SoftSkyBlue)
                     }
                 }

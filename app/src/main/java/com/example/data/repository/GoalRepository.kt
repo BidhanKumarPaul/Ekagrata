@@ -14,7 +14,7 @@ class GoalRepository(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
     val allGoals: Flow<List<Goal>> = goalDao.getAllGoals().map { entities ->
-        entities.map { it.toModel() }
+        entities.take(7).map { it.toModel() }
     }
 
     val activeGoal: Flow<Goal?> = goalDao.getActiveGoal().map { entity ->
@@ -37,17 +37,28 @@ class GoalRepository(
             deadlineDays = deadlineDays,
             milestones = milestones.joinToString(";;")
         )
-        goalDao.insertGoal(entity)
+        val newId = goalDao.insertGoal(entity)
+        // Automatically prune older goals beyond the newest 7
+        goalDao.pruneGoalsKeepNewest7()
+        newId
     }
 
-    suspend fun addFocusHours(goalId: Long, hours: Float) = withContext(ioDispatcher) {
-        goalDao.addFocusTime(goalId, hours)
-        // Check if completed
-        val goal = goalDao.getGoalById(goalId)
+    suspend fun addFocusHours(goalId: Long?, hours: Float) = withContext(ioDispatcher) {
+        if (hours <= 0f) return@withContext
+        val targetId = if (goalId != null && goalId > 0) {
+            goalId
+        } else {
+            // Fallback to first existing goal
+            goalDao.getGoalById(1L)?.id
+        } ?: return@withContext
+
+        goalDao.addFocusTime(targetId, hours)
+        val goal = goalDao.getGoalById(targetId)
         if (goal != null && goal.completedHours >= goal.targetHours && !goal.isCompleted) {
             goalDao.updateGoal(goal.copy(isCompleted = true))
         }
     }
+
 
     suspend fun ensureDefaultGoal() = withContext(ioDispatcher) {
         // Will be called on app init to seed initial goal if table empty

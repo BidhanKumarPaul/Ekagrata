@@ -50,7 +50,11 @@ interface GoalDao {
 
     @Query("DELETE FROM goals WHERE id = :id")
     suspend fun deleteGoal(id: Long)
+
+    @Query("DELETE FROM goals WHERE id NOT IN (SELECT id FROM goals ORDER BY createdAt DESC LIMIT 7)")
+    suspend fun pruneGoalsKeepNewest7()
 }
+
 
 @Dao
 interface FocusSessionDao {

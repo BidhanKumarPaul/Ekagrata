@@ -12,9 +12,10 @@ import androidx.room.RoomDatabase
         FocusSessionEntity::class,
         UserSettingsEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
+
 abstract class EkagrataDatabase : RoomDatabase() {
     abstract fun appPreferenceDao(): AppPreferenceDao
     abstract fun goalDao(): GoalDao

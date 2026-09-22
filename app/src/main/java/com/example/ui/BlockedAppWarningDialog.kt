@@ -24,7 +24,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.model.AppInfo
-import com.example.ui.theme.AcademicIndigo
+import com.example.ui.components.BkpWatermark
 import com.example.ui.theme.CardSurface
 import com.example.ui.theme.DeepObsidian
 import com.example.ui.theme.FocusAmber
@@ -51,7 +51,7 @@ fun BlockedAppWarningDialog(
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = "Distraction Shield",
+                    text = "Distraction Shield Active",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -61,7 +61,7 @@ fun BlockedAppWarningDialog(
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "You are currently in Kendrīkaraṇa Mode for:",
+                    text = "You are currently immersed in Kendrīkaraṇa for:",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -74,17 +74,16 @@ fun BlockedAppWarningDialog(
                 )
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
-                    text = "${app.label} is not permitted during this deep concentration session. Opening it will be recorded as an interruption.",
+                    text = "${app.label} is strictly blocked during Kendrīkaraṇa. Only apps in the Urvarā section are permitted to be used.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                com.example.ui.components.BkpWatermark(subtle = true)
+                BkpWatermark(subtle = true)
             }
         },
-
         confirmButton = {
             Button(
                 onClick = onBackToFocus,
@@ -95,7 +94,7 @@ fun BlockedAppWarningDialog(
                     contentColor = DeepObsidian
                 )
             ) {
-                Text("Back to Focus", fontWeight = FontWeight.Bold)
+                Text("Stay Focused", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
@@ -104,7 +103,7 @@ fun BlockedAppWarningDialog(
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = FocusCrimson)
             ) {
-                Text("Open Anyway")
+                Text("End Kendrīkaraṇa")
             }
         }
     )

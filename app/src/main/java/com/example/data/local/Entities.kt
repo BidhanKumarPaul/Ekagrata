@@ -47,8 +47,10 @@ data class UserSettingsEntity(
     val strictModeEnabled: Boolean = false,
     val soundChimeEnabled: Boolean = true,
     val sanskritMantrasEnabled: Boolean = true,
+    val hanumanChalisaEnabled: Boolean = true,
     val keepScreenOn: Boolean = true,
     val activeGoalId: Long? = null,
-    val is24HourFormat: Boolean = false
+    val is24HourFormat: Boolean = false,
+    val githubUrl: String = "https://github.com/BidhanKumarPaul",
+    val websiteUrl: String = "https://bidhankumarpaul.github.io/"
 )
-

@@ -460,11 +460,19 @@ fun ActiveGoalCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val completedText = if (goal.completedHours < 0.1f && goal.completedHours > 0f) {
+                        "${(goal.completedHours * 60).toInt()}m"
+                    } else if (goal.completedHours < 1.0f) {
+                        "${(goal.completedHours * 60).toInt()}m (${String.format(Locale.getDefault(), "%.1fh", goal.completedHours)})"
+                    } else {
+                        "${String.format(Locale.getDefault(), "%.1f", goal.completedHours)} hrs"
+                    }
                     Text(
-                        text = "${String.format(Locale.getDefault(), "%.1f", goal.completedHours)} / ${String.format(Locale.getDefault(), "%.1f", goal.targetHours)} hrs",
+                        text = "$completedText / ${String.format(Locale.getDefault(), "%.1f", goal.targetHours)} hrs",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+
 
                     Text(
                         text = "${goal.progressPercentage}%",
@@ -590,7 +598,7 @@ fun EssentialAppsSection(
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
-            text = "ESSENTIAL APPS",
+            text = "URVARĀ (ALLOWED APPS)",
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.5.sp,
@@ -606,7 +614,7 @@ fun EssentialAppsSection(
                 color = CardSurface
             ) {
                 Text(
-                    text = "Essential tools will appear here. Star apps in the drawer to pin them.",
+                    text = "Allowed Urvarā apps will appear here. Toggle apps in the drawer or session setup.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(16.dp),
