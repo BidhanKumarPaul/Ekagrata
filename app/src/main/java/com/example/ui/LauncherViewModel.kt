@@ -15,6 +15,8 @@ import com.example.model.AppInfo
 import com.example.model.FocusMode
 import com.example.model.FocusSession
 import com.example.model.Goal
+import com.example.service.KendrikaranaStateHolder
+import com.example.service.UsageStatsBlockerManager
 import com.example.util.MindfulChimeHelper
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -97,8 +99,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val goalRepository = GoalRepository(database.goalDao())
     val focusSessionRepository = FocusSessionRepository(database.focusSessionDao())
     val settingsRepository = SettingsRepository(database.userSettingsDao())
+    val usageStatsBlockerManager = UsageStatsBlockerManager(application)
 
     private val uiControls = MutableStateFlow(UiControls())
+    private val customSettingsOverride = MutableStateFlow<UserSettingsEntity?>(null)
 
     private var timerJob: Job? = null
 
@@ -118,11 +122,18 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         Pair(todayMins, xp)
     }
 
+    private val effectiveSettingsFlow = combine(
+        settingsRepository.settingsFlow,
+        customSettingsOverride
+    ) { fromDb, override ->
+        override ?: fromDb
+    }
+
     private val baseDataFlow = combine(
         appRepository.appsFlow,
         goalRepository.allGoals,
         goalRepository.activeGoal,
-        settingsRepository.settingsFlow,
+        effectiveSettingsFlow,
         sessionsStatsFlow
     ) { apps, goals, activeGoalFromDao, settings, sessionStats ->
         val (todayMins, xp) = sessionStats
@@ -221,12 +232,15 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun saveUserSettings(settings: UserSettingsEntity) {
+        customSettingsOverride.value = settings
         viewModelScope.launch {
             settingsRepository.saveSettings(settings)
         }
     }
 
     fun resetUserSettings() {
+        val defaults = UserSettingsEntity()
+        customSettingsOverride.value = defaults
         viewModelScope.launch {
             settingsRepository.resetToDefaults()
         }
@@ -318,6 +332,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
+        val allowedPkgs = sessionAllowedPackageNames ?: uiState.value.allowedFocusApps.map { it.packageName }.toSet()
+        // Activate system-wide key event consumption and strict usage stats blocker
+        KendrikaranaStateHolder.setSessionActive(true, allowedPkgs)
+        usageStatsBlockerManager.startMonitoring()
+
         uiControls.update {
             it.copy(
                 activeSession = ActiveSessionState.Active(
@@ -379,6 +398,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun endKendrikaranaEarly() {
         val session = uiControls.value.activeSession
         timerJob?.cancel()
+        KendrikaranaStateHolder.setSessionActive(false, emptySet())
+        usageStatsBlockerManager.stopMonitoring()
+
         if (session is ActiveSessionState.Active) {
             val elapsedSeconds = session.totalSeconds - session.remainingSeconds
             val elapsedMins = (elapsedSeconds + 59) / 60
@@ -426,6 +448,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     private fun completeSession(session: ActiveSessionState.Active) {
         timerJob?.cancel()
+        KendrikaranaStateHolder.setSessionActive(false, emptySet())
+        usageStatsBlockerManager.stopMonitoring()
+
         val plannedMins = session.totalSeconds / 60
         val actualMins = if (plannedMins > 0) plannedMins else 1
 
@@ -458,6 +483,28 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 )
             }
         }
+    }
+
+    fun showBlockedAppIntervention(packageName: String) {
+        val app = uiState.value.allApps.firstOrNull { it.packageName == packageName }
+            ?: AppInfo(
+                packageName = packageName,
+                activityName = "",
+                label = packageName.substringAfterLast('.').replaceFirstChar { it.uppercase() }
+            )
+        uiControls.update {
+            it.copy(
+                blockedAppWarning = app,
+                showEndEarlyConfirmation = true
+            )
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        timerJob?.cancel()
+        KendrikaranaStateHolder.setSessionActive(false, emptySet())
+        usageStatsBlockerManager.stopMonitoring()
     }
 
     fun playMotivationalSound() {

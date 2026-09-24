@@ -457,7 +457,13 @@ fun AppDrawerSheet(
             },
             onToggleAllowed = {
                 onToggleAllowedInFocus(app.packageName)
-                selectedAppForDetails = app.copy(isAllowedInFocus = !app.isAllowedInFocus)
+                val wasUrvara = app.category == AppCategory.URVARA && app.isAllowedInFocus
+                val willBeUrvara = !wasUrvara
+                selectedAppForDetails = app.copy(
+                    category = if (willBeUrvara) AppCategory.URVARA else AppCategory.OTHER,
+                    isAllowedInFocus = willBeUrvara,
+                    isEssential = willBeUrvara
+                )
             },
             onToggleFavorite = {
                 onToggleFavorite(app.packageName)
@@ -821,7 +827,7 @@ private fun AppQuickActionDialog(
     onToggleAllowed: () -> Unit,
     onToggleFavorite: () -> Unit
 ) {
-    val isUrvara = app.isAllowedInFocus || app.category == AppCategory.URVARA
+    val isUrvara = app.category == AppCategory.URVARA && app.isAllowedInFocus
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -843,78 +849,60 @@ private fun AppQuickActionDialog(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = app.category.categoryTitle,
+                        text = if (isUrvara) "Urvarā Focus Allowed" else app.category.categoryTitle,
                         style = MaterialTheme.typography.labelSmall,
-                        color = SoftSkyBlue
+                        color = if (isUrvara) CalmEmerald else SoftSkyBlue
                     )
                 }
             }
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                // Urvarā Toggle (strictly for Urvarā tools)
-                if (app.category == AppCategory.URVARA) {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = CardSurface,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+                // Focus Shield & Urvarā Allowed Toggle (for ALL apps)
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = CardSurface,
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (isUrvara) CalmEmerald.copy(alpha = 0.6f) else CardBorder
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Urvarā Allowed Tool",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "Permitted during Kendrīkaraṇa focus sessions",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Switch(
-                                checked = isUrvara,
-                                onCheckedChange = { onToggleAllowed() },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = CalmEmerald,
-                                    checkedTrackColor = CalmEmerald.copy(alpha = 0.3f)
-                                )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (isUrvara) "Focus Shield: Allowed in Urvarā" else "Focus Shield: Blocked",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isUrvara) CalmEmerald else MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (isUrvara)
+                                    "Permitted during Kendrīkaraṇa focus sessions & Urvarā shelf."
+                                else
+                                    "Strictly blocked in Kendrīkaraṇa. Toggle on to add to Urvarā.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    }
-                } else {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = CardSurface.copy(alpha = 0.5f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    text = "Focus Shield: Strictly Shielded",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "Non-Urvarā apps are strictly blocked in Kendrīkaraṇa",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                )
-                            }
-                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Switch(
+                            checked = isUrvara,
+                            onCheckedChange = { onToggleAllowed() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = DeepObsidian,
+                                checkedTrackColor = CalmEmerald,
+                                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                                uncheckedTrackColor = DeepObsidian
+                            ),
+                            modifier = Modifier.testTag("app_quick_action_urvara_switch")
+                        )
                     }
                 }
 

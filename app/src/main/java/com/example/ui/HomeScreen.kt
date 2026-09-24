@@ -6,6 +6,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.ElectricBolt
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Timer
@@ -46,9 +48,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -121,6 +125,8 @@ fun HomeScreen(
         }
     }
 
+    var pullUpDragY by remember { mutableFloatStateOf(0f) }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -135,12 +141,33 @@ fun HomeScreen(
             )
             .statusBarsPadding()
             .navigationBarsPadding()
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragStart = { pullUpDragY = 0f },
+                    onDragEnd = {
+                        // Strong pull up gesture opens app drawer
+                        if (pullUpDragY < -100f) {
+                            onOpenDrawerClick()
+                        }
+                        pullUpDragY = 0f
+                    },
+                    onDragCancel = { pullUpDragY = 0f },
+                    onVerticalDrag = { _, dragAmount ->
+                        pullUpDragY += dragAmount
+                        if (pullUpDragY < -180f) {
+                            onOpenDrawerClick()
+                            pullUpDragY = 0f
+                        }
+                    }
+                )
+            }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp)
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 80.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -386,6 +413,47 @@ fun HomeScreen(
             BkpWatermark(asPill = true)
 
             Spacer(modifier = Modifier.height(24.dp))
+        }
+
+        // Dedicated App Drawer Button pinned at the bottom of the Home screen
+        Surface(
+            onClick = onOpenDrawerClick,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 12.dp)
+                .testTag("app_drawer_bottom_button"),
+            shape = RoundedCornerShape(24.dp),
+            color = SlateNavy.copy(alpha = 0.95f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, SoftSkyBlue.copy(alpha = 0.6f)),
+            shadowElevation = 8.dp
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowUp,
+                    contentDescription = null,
+                    tint = SoftSkyBlue,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Icon(
+                    imageVector = Icons.Default.Apps,
+                    contentDescription = "App Drawer",
+                    tint = SoftSkyBlue,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "App Drawer",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
+                )
+            }
         }
     }
 }

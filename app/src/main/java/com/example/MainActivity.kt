@@ -2,6 +2,7 @@ package com.example
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
@@ -17,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.service.KendrikaranaStateHolder
 import com.example.ui.ActiveSessionState
 import com.example.ui.AppDrawerSheet
 import com.example.ui.BlockedAppWarningDialog
@@ -31,11 +33,25 @@ import com.example.ui.theme.EkagrataTheme
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        const val ACTION_END_KENDRIKARANA = "com.example.action.END_KENDRIKARANA"
+        const val EXTRA_BLOCKED_PACKAGE = "extra_blocked_package"
+    }
+
     private val viewModel: LauncherViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Listen for accessibility service redirection to trigger End Kendrīkaraṇa dialog
+        KendrikaranaStateHolder.addEndKendrikaranaListener {
+            runOnUiThread {
+                if (viewModel.uiState.value.activeSession is ActiveSessionState.Active) {
+                    viewModel.requestEndEarlyConfirmation(true)
+                }
+            }
+        }
 
         // Redirect back button to End Kendrīkaraṇa when focus is active
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -62,6 +78,16 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (viewModel.uiState.value.activeSession is ActiveSessionState.Active) {
+            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_HOME || keyCode == KeyEvent.KEYCODE_APP_SWITCH) {
+                viewModel.requestEndEarlyConfirmation(true)
+                return true
+            }
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     override fun onResume() {
@@ -91,8 +117,15 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (viewModel.uiState.value.activeSession is ActiveSessionState.Active) {
-            // Home button pressed: Redirect to the button End Kendrīkaraṇa!
+        if (intent.action == ACTION_END_KENDRIKARANA) {
+            val blockedPkg = intent.getStringExtra(EXTRA_BLOCKED_PACKAGE)
+            if (blockedPkg != null) {
+                viewModel.showBlockedAppIntervention(blockedPkg)
+            } else {
+                viewModel.requestEndEarlyConfirmation(true)
+            }
+        } else if (viewModel.uiState.value.activeSession is ActiveSessionState.Active) {
+            // Home or navigation button pressed: Redirect to End Kendrīkaraṇa!
             viewModel.requestEndEarlyConfirmation(true)
         }
         viewModel.isLaunchingAllowedApp = false

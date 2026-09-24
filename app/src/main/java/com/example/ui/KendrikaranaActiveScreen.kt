@@ -124,9 +124,17 @@ fun KendrikaranaActiveScreen(
         label = "pulse_scale"
     )
 
-    // Mantras list including Hanuman Chalisa if enabled
+    // Mantras list properly filtered according to Sanskrit and Hanuman Chalisa settings
     val mantraList = remember(showSanskritMantras, hanumanChalisaEnabled) {
-        KendrikaranaWisdom.getFilteredMantras(hanumanChalisaEnabled)
+        if (!showSanskritMantras && !hanumanChalisaEnabled) {
+            emptyList()
+        } else if (showSanskritMantras && hanumanChalisaEnabled) {
+            KendrikaranaWisdom.allMantras
+        } else if (showSanskritMantras) {
+            KendrikaranaWisdom.allMantras.filter { !it.isHanumanChalisa }
+        } else {
+            KendrikaranaWisdom.allMantras.filter { it.isHanumanChalisa }
+        }
     }
 
     var currentMantraIndex by remember { mutableIntStateOf(0) }
@@ -137,7 +145,9 @@ fun KendrikaranaActiveScreen(
         }
     }
 
-    val currentMantra = mantraList.getOrNull(currentMantraIndex % mantraList.size.coerceAtLeast(1))
+    val currentMantra = if (mantraList.isNotEmpty()) {
+        mantraList.getOrNull(currentMantraIndex % mantraList.size)
+    } else null
 
     Box(
         modifier = modifier
@@ -289,7 +299,7 @@ fun KendrikaranaActiveScreen(
                 }
 
                 // Sacred Focus Mantra & Hanuman Chalisa Banner
-                if (showSanskritMantras && currentMantra != null) {
+                if (currentMantra != null) {
                     Spacer(modifier = Modifier.height(20.dp))
                     Surface(
                         modifier = Modifier
@@ -372,8 +382,37 @@ fun KendrikaranaActiveScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Urvarā Section: Allowed Apps Tray in Kendrīkaraṇa mode
-                if (allowedApps.isNotEmpty()) {
+                // Strict Lockout vs Urvarā Section: Allowed Apps Tray in Kendrīkaraṇa mode
+                if (isStrictMode) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                        color = FocusCrimson.copy(alpha = 0.15f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, FocusCrimson.copy(alpha = 0.5f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Security,
+                                contentDescription = null,
+                                tint = FocusCrimson,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Strict Lockout: All Apps Blocked",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = FocusCrimson
+                            )
+                        }
+                    }
+                } else if (allowedApps.isNotEmpty()) {
                     Text(
                         text = "URVARĀ (ALLOWED APPS)",
                         style = MaterialTheme.typography.labelSmall,

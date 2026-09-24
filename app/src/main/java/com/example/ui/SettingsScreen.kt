@@ -113,14 +113,14 @@ fun SettingsScreen(
         onBackToDashboard()
     }
 
-    var dailyTarget by remember(currentSettings) { mutableIntStateOf(currentSettings.dailyTargetMinutes) }
-    var defaultDuration by remember(currentSettings) { mutableIntStateOf(currentSettings.defaultFocusDurationMinutes) }
-    var strictMode by remember(currentSettings) { mutableStateOf(currentSettings.strictModeEnabled) }
-    var soundChime by remember(currentSettings) { mutableStateOf(currentSettings.soundChimeEnabled) }
-    var sanskritMantras by remember(currentSettings) { mutableStateOf(currentSettings.sanskritMantrasEnabled) }
-    var hanumanChalisa by remember(currentSettings) { mutableStateOf(currentSettings.hanumanChalisaEnabled) }
-    var keepScreenOn by remember(currentSettings) { mutableStateOf(currentSettings.keepScreenOn) }
-    var selectedGoalId by remember(currentSettings) { mutableStateOf(currentSettings.activeGoalId) }
+    var dailyTarget by remember(currentSettings.dailyTargetMinutes) { mutableIntStateOf(currentSettings.dailyTargetMinutes) }
+    var defaultDuration by remember(currentSettings.defaultFocusDurationMinutes) { mutableIntStateOf(currentSettings.defaultFocusDurationMinutes) }
+    var strictMode by remember(currentSettings.strictModeEnabled) { mutableStateOf(currentSettings.strictModeEnabled) }
+    var soundChime by remember(currentSettings.soundChimeEnabled) { mutableStateOf(currentSettings.soundChimeEnabled) }
+    var sanskritMantras by remember(currentSettings.sanskritMantrasEnabled) { mutableStateOf(currentSettings.sanskritMantrasEnabled) }
+    var hanumanChalisa by remember(currentSettings.hanumanChalisaEnabled) { mutableStateOf(currentSettings.hanumanChalisaEnabled) }
+    var keepScreenOn by remember(currentSettings.keepScreenOn) { mutableStateOf(currentSettings.keepScreenOn) }
+    var selectedGoalId by remember(currentSettings.activeGoalId) { mutableStateOf(currentSettings.activeGoalId) }
 
     var goalDropdownExpanded by remember { mutableStateOf(false) }
     var showSaveToast by remember { mutableStateOf(false) }
@@ -132,19 +132,41 @@ fun SettingsScreen(
         }
     }
 
-    fun applyAndSave() {
+    fun updateAndPersist(
+        daily: Int = dailyTarget,
+        duration: Int = defaultDuration,
+        strict: Boolean = strictMode,
+        chime: Boolean = soundChime,
+        sanskrit: Boolean = sanskritMantras,
+        hanuman: Boolean = hanumanChalisa,
+        screenOn: Boolean = keepScreenOn,
+        goalId: Long? = selectedGoalId
+    ) {
+        dailyTarget = daily
+        defaultDuration = duration
+        strictMode = strict
+        soundChime = chime
+        sanskritMantras = sanskrit
+        hanumanChalisa = hanuman
+        keepScreenOn = screenOn
+        selectedGoalId = goalId
+
         val updated = currentSettings.copy(
-            dailyTargetMinutes = dailyTarget,
-            defaultFocusDurationMinutes = defaultDuration,
-            strictModeEnabled = strictMode,
-            soundChimeEnabled = soundChime,
-            sanskritMantrasEnabled = sanskritMantras,
-            hanumanChalisaEnabled = hanumanChalisa,
-            keepScreenOn = keepScreenOn,
-            activeGoalId = selectedGoalId
+            dailyTargetMinutes = daily,
+            defaultFocusDurationMinutes = duration,
+            strictModeEnabled = strict,
+            soundChimeEnabled = chime,
+            sanskritMantrasEnabled = sanskrit,
+            hanumanChalisaEnabled = hanuman,
+            keepScreenOn = screenOn,
+            activeGoalId = goalId
         )
         onSaveSettings(updated)
         showSaveToast = true
+    }
+
+    fun applyAndSave() {
+        updateAndPersist()
     }
 
     val dailyTargetOptions = listOf(60, 120, 180, 240, 300, 360)
@@ -285,7 +307,6 @@ fun SettingsScreen(
                                     val homeIntent = Intent(Settings.ACTION_HOME_SETTINGS)
                                     context.startActivity(homeIntent)
                                 } catch (_: Exception) {
-                                    // Fallback to general settings
                                     context.startActivity(Intent(Settings.ACTION_SETTINGS))
                                 }
                             }
@@ -300,6 +321,104 @@ fun SettingsScreen(
                         )
                     ) {
                         Text("Configure Default Launcher in Android Settings")
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = CardBorder.copy(alpha = 0.5f))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Accessibility Service for Intercepting Home / Back / Recent Apps
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Security,
+                            contentDescription = null,
+                            tint = CalmEmerald,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Accessibility Shield (Key Interception)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Intercepts and consumes Home, Back, and Recent Apps keys during Kendrīkaraṇa, redirecting exclusively to End Kendrīkaraṇa.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                context.startActivity(intent)
+                            } catch (_: Exception) {}
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = CalmEmerald)
+                    ) {
+                        Text("Enable Ekāgratā in Accessibility Settings")
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = CardBorder.copy(alpha = 0.5f))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Usage Access for Strict Urvarā App Blocker
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Apps,
+                            contentDescription = null,
+                            tint = FocusAmber,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Usage Access (Strict Urvarā Blocker)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Allows the usage statistics manager to detect and immediately block launch attempts of any non-allowed apps during Kendrīkaraṇa.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                context.startActivity(intent)
+                            } catch (_: Exception) {
+                                try {
+                                    context.startActivity(Intent(Settings.ACTION_SETTINGS).apply {
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    })
+                                } catch (_: Exception) {}
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = FocusAmber)
+                    ) {
+                        Text("Grant Usage Access in Settings")
                     }
                 }
             }
@@ -507,15 +626,29 @@ fun SettingsScreen(
                     HorizontalDivider(color = CardBorder.copy(alpha = 0.5f))
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Hanuman Chalisa & Focus Mantras Toggle
+                    // Hanuman Chalisa Sacred Verses Toggle
                     SettingsSwitchRow(
                         icon = Icons.Default.Info,
-                        title = "Sacred Mantras & Hanuman Chalisa",
-                        description = "Display Hanuman Chalisa focus verses and Vedic sutras in Kendrīkaraṇa mode.",
+                        title = "Hanuman Chalisa Sacred Verses",
+                        description = "Display Hanuman Chalisa focus chaupais and fortitude verses during Kendrīkaraṇa mode.",
                         checked = hanumanChalisa,
                         onCheckedChange = {
-                            hanumanChalisa = it
-                            applyAndSave()
+                            updateAndPersist(hanuman = it)
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider(color = CardBorder.copy(alpha = 0.5f))
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Vedic Focus Mantras & Sutras Toggle
+                    SettingsSwitchRow(
+                        icon = Icons.Default.Language,
+                        title = "Vedic Focus Sutras & Wisdom",
+                        description = "Display Bhagavad Gita, Upanishadic, and Patanjali focus sutras for deep concentration.",
+                        checked = sanskritMantras,
+                        onCheckedChange = {
+                            updateAndPersist(sanskrit = it)
                         }
                     )
 
@@ -545,7 +678,7 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "Acoustic bells for start, interval & completion.",
+                                    text = "Acoustic bells for session start, intervals & completion.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -555,8 +688,7 @@ fun SettingsScreen(
                         Switch(
                             checked = soundChime,
                             onCheckedChange = {
-                                soundChime = it
-                                applyAndSave()
+                                updateAndPersist(chime = it)
                             }
                         )
                     }
@@ -585,6 +717,21 @@ fun SettingsScreen(
                     HorizontalDivider(color = CardBorder.copy(alpha = 0.5f))
                     Spacer(modifier = Modifier.height(14.dp))
 
+                    // Keep Screen Awake Toggle
+                    SettingsSwitchRow(
+                        icon = Icons.Default.Visibility,
+                        title = "Keep Screen Awake",
+                        description = "Prevent display timeout and maintain active focus timer visibility throughout Kendrīkaraṇa.",
+                        checked = keepScreenOn,
+                        onCheckedChange = {
+                            updateAndPersist(screenOn = it)
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider(color = CardBorder.copy(alpha = 0.5f))
+                    Spacer(modifier = Modifier.height(14.dp))
+
                     // Strict Mode Toggle
                     SettingsSwitchRow(
                         icon = Icons.Default.Security,
@@ -592,8 +739,7 @@ fun SettingsScreen(
                         description = "When enabled, hides and disallows Urvarā (allowed apps) during Kendrīkaraṇa for total zero-app lockdown.",
                         checked = strictMode,
                         onCheckedChange = {
-                            strictMode = it
-                            applyAndSave()
+                            updateAndPersist(strict = it)
                         }
                     )
                 }

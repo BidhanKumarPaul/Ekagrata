@@ -168,22 +168,23 @@ class AppRepository(
     suspend fun toggleAllowedInFocus(packageName: String) = withContext(ioDispatcher) {
         val current = preferenceDao.getPreference(packageName)
         val defaultCategory = guessCategory(packageName, "")
-        val isUrvara = current?.customCategory == AppCategory.URVARA.name || (current?.customCategory == null && defaultCategory == AppCategory.URVARA)
-        // Only Urvarā apps are permitted to be toggled for focus mode
-        if (!isUrvara) return@withContext
+        val isCurrentlyUrvara = (current?.customCategory == AppCategory.URVARA.name ||
+                (current?.customCategory == null && defaultCategory == AppCategory.URVARA)) &&
+                (current?.isAllowedInFocus ?: true)
 
-        val currentAllowed = current?.isAllowedInFocus ?: true
-        val nextAllowed = !currentAllowed
+        val nextAllowed = !isCurrentlyUrvara
 
         val updated = AppPreferenceEntity(
             packageName = packageName,
             isFavorite = current?.isFavorite ?: false,
             isAllowedInFocus = nextAllowed,
-            isEssential = true,
-            customCategory = AppCategory.URVARA.name
+            isEssential = nextAllowed,
+            customCategory = if (nextAllowed) AppCategory.URVARA.name else "OTHER"
         )
         preferenceDao.upsertPreference(updated)
     }
+
+    suspend fun toggleUrvaraAllowed(packageName: String) = toggleAllowedInFocus(packageName)
 
     suspend fun toggleEssential(packageName: String) = withContext(ioDispatcher) {
         val current = preferenceDao.getPreference(packageName)
