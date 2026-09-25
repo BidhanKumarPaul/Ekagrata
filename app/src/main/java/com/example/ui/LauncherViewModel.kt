@@ -258,6 +258,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun setUrvaraAllowed(packageName: String, allowed: Boolean) {
+        viewModelScope.launch {
+            appRepository.setUrvaraAllowed(packageName, allowed)
+        }
+    }
+
     fun toggleEssential(packageName: String) {
         viewModelScope.launch {
             appRepository.toggleEssential(packageName)

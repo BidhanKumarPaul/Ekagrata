@@ -106,6 +106,7 @@ fun AppDrawerSheet(
     onAppClick: (AppInfo) -> Unit,
     onToggleFavorite: (String) -> Unit,
     onToggleAllowedInFocus: (String) -> Unit,
+    onSetUrvaraAllowed: ((String, Boolean) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     // Intercept back press cleanly to close the drawer
@@ -423,6 +424,9 @@ fun AppDrawerSheet(
                                         onAppClick(app)
                                         onDismiss()
                                     },
+                                    onLongClick = {
+                                        selectedAppForDetails = app
+                                    },
                                     onToggleFavorite = { onToggleFavorite(app.packageName) },
                                     onToggleAllowedInFocus = { onToggleAllowedInFocus(app.packageName) }
                                 )
@@ -445,29 +449,32 @@ fun AppDrawerSheet(
         }
     }
 
-    // Modern App Action Sheet / Dialog for Grid long-press
+    // Modern App Action Sheet / Dialog for Grid & List long-press
     selectedAppForDetails?.let { app ->
+        val currentApp = apps.find { it.packageName == app.packageName } ?: app
         AppQuickActionDialog(
-            app = app,
+            app = currentApp,
             onDismiss = { selectedAppForDetails = null },
             onLaunch = {
                 selectedAppForDetails = null
-                onAppClick(app)
+                onAppClick(currentApp)
                 onDismiss()
             },
-            onToggleAllowed = {
-                onToggleAllowedInFocus(app.packageName)
-                val wasUrvara = app.category == AppCategory.URVARA && app.isAllowedInFocus
-                val willBeUrvara = !wasUrvara
-                selectedAppForDetails = app.copy(
-                    category = if (willBeUrvara) AppCategory.URVARA else AppCategory.OTHER,
-                    isAllowedInFocus = willBeUrvara,
-                    isEssential = willBeUrvara
+            onToggleAllowed = { allowed ->
+                if (onSetUrvaraAllowed != null) {
+                    onSetUrvaraAllowed(currentApp.packageName, allowed)
+                } else {
+                    onToggleAllowedInFocus(currentApp.packageName)
+                }
+                selectedAppForDetails = currentApp.copy(
+                    category = if (allowed) AppCategory.URVARA else AppCategory.OTHER,
+                    isAllowedInFocus = allowed,
+                    isEssential = allowed
                 )
             },
-            onToggleFavorite = {
-                onToggleFavorite(app.packageName)
-                selectedAppForDetails = app.copy(isFavorite = !app.isFavorite)
+            onToggleFavorite = { fav ->
+                onToggleFavorite(currentApp.packageName)
+                selectedAppForDetails = currentApp.copy(isFavorite = fav)
             }
         )
     }
@@ -705,10 +712,12 @@ private fun ModernAppGridItem(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun ModernAppListItem(
     app: AppInfo,
     onAppClick: () -> Unit,
+    onLongClick: () -> Unit = {},
     onToggleFavorite: () -> Unit,
     onToggleAllowedInFocus: () -> Unit
 ) {
@@ -719,7 +728,10 @@ private fun ModernAppListItem(
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .border(1.dp, CardBorder, RoundedCornerShape(14.dp))
-            .clickable { onAppClick() },
+            .combinedClickable(
+                onClick = onAppClick,
+                onLongClick = onLongClick
+            ),
         color = CardSurface
     ) {
         Row(
@@ -824,10 +836,12 @@ private fun AppQuickActionDialog(
     app: AppInfo,
     onDismiss: () -> Unit,
     onLaunch: () -> Unit,
-    onToggleAllowed: () -> Unit,
-    onToggleFavorite: () -> Unit
+    onToggleAllowed: (Boolean) -> Unit,
+    onToggleFavorite: (Boolean) -> Unit
 ) {
-    val isUrvara = app.category == AppCategory.URVARA && app.isAllowedInFocus
+    val initialUrvara = app.isAllowedInFocus || app.category == AppCategory.URVARA
+    var isUrvara by remember(app.packageName, app.isAllowedInFocus, app.category) { mutableStateOf(initialUrvara) }
+    var isFav by remember(app.packageName, app.isFavorite) { mutableStateOf(app.isFavorite) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -849,7 +863,7 @@ private fun AppQuickActionDialog(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = if (isUrvara) "Urvarā Focus Allowed" else app.category.categoryTitle,
+                        text = if (isUrvara) "Urvarā Focus Allowed (उर्वरा)" else app.category.categoryTitle,
                         style = MaterialTheme.typography.labelSmall,
                         color = if (isUrvara) CalmEmerald else SoftSkyBlue
                     )
@@ -865,7 +879,12 @@ private fun AppQuickActionDialog(
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp,
                         if (isUrvara) CalmEmerald.copy(alpha = 0.6f) else CardBorder
-                    )
+                    ),
+                    onClick = {
+                        val next = !isUrvara
+                        isUrvara = next
+                        onToggleAllowed(next)
+                    }
                 ) {
                     Row(
                         modifier = Modifier
@@ -886,7 +905,7 @@ private fun AppQuickActionDialog(
                                 text = if (isUrvara)
                                     "Permitted during Kendrīkaraṇa focus sessions & Urvarā shelf."
                                 else
-                                    "Strictly blocked in Kendrīkaraṇa. Toggle on to add to Urvarā.",
+                                    "Strictly blocked in Kendrīkaraṇa. Tap to add to Urvarā.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -894,7 +913,10 @@ private fun AppQuickActionDialog(
                         Spacer(modifier = Modifier.width(12.dp))
                         Switch(
                             checked = isUrvara,
-                            onCheckedChange = { onToggleAllowed() },
+                            onCheckedChange = { next ->
+                                isUrvara = next
+                                onToggleAllowed(next)
+                            },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = DeepObsidian,
                                 checkedTrackColor = CalmEmerald,
@@ -910,7 +932,15 @@ private fun AppQuickActionDialog(
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = CardSurface,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (isFav) FocusAmber.copy(alpha = 0.5f) else CardBorder
+                    ),
+                    onClick = {
+                        val next = !isFav
+                        isFav = next
+                        onToggleFavorite(next)
+                    }
                 ) {
                     Row(
                         modifier = Modifier
@@ -921,23 +951,28 @@ private fun AppQuickActionDialog(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Favorite App",
+                                text = if (isFav) "Favorite App (Pinned)" else "Favorite App",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = if (isFav) FocusAmber else MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Pinned to home screen favorites",
+                                text = if (isFav) "Pinned to home screen favorites" else "Pin to home screen favorites",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         Switch(
-                            checked = app.isFavorite,
-                            onCheckedChange = { onToggleFavorite() },
+                            checked = isFav,
+                            onCheckedChange = { next ->
+                                isFav = next
+                                onToggleFavorite(next)
+                            },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = FocusAmber,
-                                checkedTrackColor = FocusAmber.copy(alpha = 0.3f)
+                                checkedThumbColor = DeepObsidian,
+                                checkedTrackColor = FocusAmber,
+                                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                                uncheckedTrackColor = DeepObsidian
                             )
                         )
                     }

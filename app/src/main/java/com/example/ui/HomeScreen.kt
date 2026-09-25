@@ -6,6 +6,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ElectricBolt
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -93,6 +95,7 @@ fun HomeScreen(
     onOpenDrawerClick: () -> Unit,
     onAppClick: (AppInfo) -> Unit,
     onCreateGoalClick: () -> Unit,
+    onAppLongClick: ((AppInfo) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
 
@@ -341,10 +344,11 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // Essential Apps Section
+            // Essential Apps Section (Urvarā)
             EssentialAppsSection(
                 essentialApps = uiState.essentialApps,
-                onAppClick = onAppClick
+                onAppClick = onAppClick,
+                onAppLongClick = onAppLongClick
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -381,54 +385,36 @@ fun HomeScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // App Drawer Handle
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .clickable { onOpenDrawerClick() }
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .testTag("drawer_handle"),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Apps,
-                    contentDescription = "All Apps",
-                    tint = SoftSkyBlue,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "App Drawer",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = SoftSkyBlue,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
             Spacer(modifier = Modifier.height(20.dp))
 
             // Mandatory Watermark prominently placed on Dashboard
             BkpWatermark(asPill = true)
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
         }
 
-        // Dedicated App Drawer Button pinned at the bottom of the Home screen
+        // Dedicated Floating App Drawer Capsule pinned at the bottom of the Home screen
         Surface(
             onClick = onOpenDrawerClick,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 12.dp)
+                .padding(bottom = 16.dp)
                 .testTag("app_drawer_bottom_button"),
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(28.dp),
             color = SlateNavy.copy(alpha = 0.95f),
-            border = androidx.compose.foundation.BorderStroke(1.dp, SoftSkyBlue.copy(alpha = 0.6f)),
-            shadowElevation = 8.dp
+            border = androidx.compose.foundation.BorderStroke(
+                1.5.dp,
+                Brush.horizontalGradient(
+                    listOf(
+                        SoftSkyBlue.copy(alpha = 0.85f),
+                        CalmEmerald.copy(alpha = 0.85f)
+                    )
+                )
+            ),
+            shadowElevation = 12.dp
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
@@ -445,13 +431,13 @@ fun HomeScreen(
                     tint = SoftSkyBlue,
                     modifier = Modifier.size(18.dp)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = "App Drawer",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp
+                    letterSpacing = 0.75.sp
                 )
             }
         }
@@ -659,30 +645,55 @@ fun DailyStatsBar(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun EssentialAppsSection(
     essentialApps: List<AppInfo>,
-    onAppClick: (AppInfo) -> Unit
+    onAppClick: (AppInfo) -> Unit,
+    onAppLongClick: ((AppInfo) -> Unit)? = null
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "URVARĀ (ALLOWED APPS)",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.5.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 4.dp, bottom = 12.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 4.dp, bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "URVARĀ (ALLOWED APPS)",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.5.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (essentialApps.isNotEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = CalmEmerald.copy(alpha = 0.15f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CalmEmerald.copy(alpha = 0.35f))
+                ) {
+                    Text(
+                        text = "${essentialApps.size} active",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = CalmEmerald,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    )
+                }
+            }
+        }
 
         if (essentialApps.isEmpty()) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp)),
-                color = CardSurface
+                color = CardSurface,
+                border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
             ) {
                 Text(
-                    text = "Allowed Urvarā apps will appear here. Toggle apps in the drawer or session setup.",
+                    text = "Allowed Urvarā apps will appear here. Long press any app in the drawer to add it to Urvarā.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(16.dp),
@@ -700,14 +711,38 @@ fun EssentialAppsSection(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
                             .width(68.dp)
-                            .clickable { onAppClick(app) }
+                            .clip(RoundedCornerShape(14.dp))
+                            .combinedClickable(
+                                onClick = { onAppClick(app) },
+                                onLongClick = { onAppLongClick?.invoke(app) }
+                            )
+                            .padding(vertical = 4.dp)
                     ) {
-                        AppIconView(
-                            packageName = app.packageName,
-                            label = app.label,
-                            category = app.category,
-                            size = 54.dp
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            AppIconView(
+                                packageName = app.packageName,
+                                label = app.label,
+                                category = app.category,
+                                size = 54.dp
+                            )
+                            Surface(
+                                shape = CircleShape,
+                                color = DeepObsidian,
+                                border = androidx.compose.foundation.BorderStroke(1.5.dp, CalmEmerald),
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .align(Alignment.TopEnd)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Urvarā",
+                                        tint = CalmEmerald,
+                                        modifier = Modifier.size(10.dp)
+                                    )
+                                }
+                            }
+                        }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = app.label,

@@ -82,12 +82,46 @@ class MainActivity : ComponentActivity() {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (viewModel.uiState.value.activeSession is ActiveSessionState.Active) {
-            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_HOME || keyCode == KeyEvent.KEYCODE_APP_SWITCH) {
+            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_HOME ||
+                keyCode == KeyEvent.KEYCODE_APP_SWITCH || keyCode == 187 ||
+                keyCode == KeyEvent.KEYCODE_MENU || keyCode == 82
+            ) {
                 viewModel.requestEndEarlyConfirmation(true)
                 return true
             }
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (viewModel.uiState.value.activeSession is ActiveSessionState.Active) {
+            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_HOME ||
+                keyCode == KeyEvent.KEYCODE_APP_SWITCH || keyCode == 187 ||
+                keyCode == KeyEvent.KEYCODE_MENU || keyCode == 82
+            ) {
+                viewModel.requestEndEarlyConfirmation(true)
+                return true
+            }
+        }
+        return super.onKeyUp(keyCode, event)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus && viewModel.uiState.value.activeSession is ActiveSessionState.Active) {
+            if (!viewModel.isLaunchingAllowedApp) {
+                // Intercept Recent Apps / notification shade attempt: close system dialogs and prompt End Kendrīkaraṇa
+                try {
+                    @Suppress("DEPRECATION")
+                    sendBroadcast(Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS))
+                } catch (_: Exception) {}
+                viewModel.requestEndEarlyConfirmation(true)
+                val bringBackIntent = Intent(this, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                startActivity(bringBackIntent)
+            }
+        }
     }
 
     override fun onResume() {
@@ -224,6 +258,7 @@ fun EkagrataApp(
                     },
                     onToggleFavorite = { viewModel.toggleFavorite(it) },
                     onToggleAllowedInFocus = { viewModel.toggleAllowedInFocus(it) },
+                    onSetUrvaraAllowed = { pkg, allowed -> viewModel.setUrvaraAllowed(pkg, allowed) },
                     onDismiss = { viewModel.toggleAppDrawer(false) }
                 )
             }
