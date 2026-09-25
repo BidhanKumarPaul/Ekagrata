@@ -34,10 +34,33 @@ jobs:
           # Ensure empty .env file exists for secrets-gradle-plugin
           touch .env
 
-          # Restore debug.keystore if base64 file exists
+          # 1. Restore from debug.keystore.base64 file if present in repository
           if [ -f debug.keystore.base64 ]; then
-            base64 -d debug.keystore.base64 > debug.keystore
-            echo "Restored debug.keystore from base64"
+            echo "Attempting to restore debug.keystore from debug.keystore.base64..."
+            base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || base64 -D debug.keystore.base64 > debug.keystore 2>/dev/null || true
+          fi
+
+          # 2. If debug.keystore still does not exist, generate standard debug.keystore with keytool
+          if [ ! -f debug.keystore ] || [ ! -s debug.keystore ]; then
+            echo "Generating standard Android debug.keystore using keytool..."
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug, O=Android, C=US"
+          fi
+
+          # 3. Verify debug.keystore is ready
+          if [ -f debug.keystore ]; then
+            echo "SUCCESS: Keystore is verified and ready:"
+            ls -lh debug.keystore
+          else
+            echo "ERROR: Failed to establish debug.keystore"
+            exit 1
           fi
 
       - name: Build Debug APK with Gradle

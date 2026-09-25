@@ -34,8 +34,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
@@ -48,7 +49,6 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -194,7 +194,7 @@ fun AppDrawerSheet(
                             .testTag("toggle_view_mode_button")
                     ) {
                         Icon(
-                            imageVector = if (layoutMode == DrawerLayoutMode.GRID) Icons.Default.ViewList else Icons.Default.GridView,
+                            imageVector = if (layoutMode == DrawerLayoutMode.GRID) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView,
                             contentDescription = "Switch View Mode",
                             tint = SoftSkyBlue,
                             modifier = Modifier.size(18.dp)
@@ -491,7 +491,7 @@ private fun ModernCategoryPill(
         AppCategory.URVARA -> Icons.Default.Security
         AppCategory.STUDY -> Icons.Default.School
         AppCategory.WORK -> Icons.Default.Work
-        AppCategory.COMMUNICATION -> Icons.Default.Chat
+        AppCategory.COMMUNICATION -> Icons.AutoMirrored.Filled.Chat
         AppCategory.ENTERTAINMENT -> Icons.Default.PlayArrow
         AppCategory.SOCIAL -> Icons.Default.People
         AppCategory.GAMES -> Icons.Default.SportsEsports

@@ -539,7 +539,7 @@ fun ActiveGoalCard(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 LinearProgressIndicator(
-                    progress = (goal.progressPercentage / 100f).coerceIn(0f, 1f),
+                    progress = { (goal.progressPercentage / 100f).coerceIn(0f, 1f) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(8.dp)

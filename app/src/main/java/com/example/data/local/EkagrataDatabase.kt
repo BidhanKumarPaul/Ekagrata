@@ -33,7 +33,7 @@ abstract class EkagrataDatabase : RoomDatabase() {
                     context.applicationContext,
                     EkagrataDatabase::class.java,
                     "ekagrata.db"
-                ).fallbackToDestructiveMigration().build()
+                ).fallbackToDestructiveMigration(true).build()
                 INSTANCE = instance
                 instance
             }
