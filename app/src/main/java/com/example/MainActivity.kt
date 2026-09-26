@@ -109,24 +109,28 @@ class MainActivity : ComponentActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (!hasFocus && viewModel.uiState.value.activeSession is ActiveSessionState.Active) {
-            if (!viewModel.isLaunchingAllowedApp) {
-                // Intercept Recent Apps / notification shade attempt: close system dialogs and prompt End Kendrīkaraṇa
-                try {
-                    @Suppress("DEPRECATION")
-                    sendBroadcast(Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS))
-                } catch (_: Exception) {}
-                viewModel.requestEndEarlyConfirmation(true)
-                val bringBackIntent = Intent(this, MainActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                }
-                startActivity(bringBackIntent)
+            if (viewModel.isLaunchingAllowedApp ||
+                KendrikaranaStateHolder.isInAllowedAppSession() ||
+                KendrikaranaStateHolder.isWithinLaunchGracePeriod() ||
+                viewModel.uiState.value.showEndEarlyConfirmation ||
+                viewModel.uiState.value.blockedAppWarning != null
+            ) {
+                return
             }
+            viewModel.requestEndEarlyConfirmation(true)
+            val bringBackIntent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            startActivity(bringBackIntent)
         }
     }
 
     override fun onResume() {
         super.onResume()
-        viewModel.isLaunchingAllowedApp = false
+        if (!KendrikaranaStateHolder.isWithinLaunchGracePeriod(1200L)) {
+            viewModel.isLaunchingAllowedApp = false
+            KendrikaranaStateHolder.onReturnedToLauncher()
+        }
         // Refresh installed applications when returning to launcher
         viewModel.refreshApps()
     }
@@ -134,9 +138,11 @@ class MainActivity : ComponentActivity() {
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         if (viewModel.uiState.value.activeSession is ActiveSessionState.Active) {
-            if (viewModel.isLaunchingAllowedApp) {
-                // Legitimate switch to allowed Urvarā app: allow opening without pulling back
-                viewModel.isLaunchingAllowedApp = false
+            if (viewModel.isLaunchingAllowedApp ||
+                KendrikaranaStateHolder.isInAllowedAppSession() ||
+                KendrikaranaStateHolder.isWithinLaunchGracePeriod()
+            ) {
+                // Legitimate switch to allowed Urvarā app: allow opening without pulling back!
                 return
             }
             // Minimise button pressed: intercept, pull back to front and redirect to the button End Kendrīkaraṇa!
@@ -159,10 +165,13 @@ class MainActivity : ComponentActivity() {
                 viewModel.requestEndEarlyConfirmation(true)
             }
         } else if (viewModel.uiState.value.activeSession is ActiveSessionState.Active) {
-            // Home or navigation button pressed: Redirect to End Kendrīkaraṇa!
-            viewModel.requestEndEarlyConfirmation(true)
+            if (!viewModel.isLaunchingAllowedApp && !KendrikaranaStateHolder.isInAllowedAppSession()) {
+                // Home or navigation button pressed: Redirect to End Kendrīkaraṇa!
+                viewModel.requestEndEarlyConfirmation(true)
+            }
         }
         viewModel.isLaunchingAllowedApp = false
+        KendrikaranaStateHolder.onReturnedToLauncher()
         viewModel.refreshApps()
     }
 }

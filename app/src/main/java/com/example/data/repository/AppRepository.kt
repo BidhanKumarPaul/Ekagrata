@@ -55,7 +55,7 @@ class AppRepository(
 
             // Strictly restrict allowed in focus to Urvarā apps only
             val isUrvara = parsedCategory == AppCategory.URVARA
-            val isAllowed = isUrvara && (pref?.isAllowedInFocus ?: true)
+            val isAllowed = isUrvara
 
             AppInfo(
                 packageName = raw.packageName,
@@ -122,36 +122,109 @@ class AppRepository(
     }
 
     /**
-     * Launches the application safely. Returns true if launch succeeded.
+     * Launches the application safely using the provided Activity/foreground context when available,
+     * with multi-stage fallback resolution so system and OEM Urvarā apps always open reliably.
      */
-    fun launchApp(packageName: String, activityName: String? = null): Boolean {
-        return try {
-            val intent = if (!activityName.isNullOrBlank()) {
-                Intent(Intent.ACTION_MAIN).apply {
-                    addCategory(Intent.CATEGORY_LAUNCHER)
-                    setClassName(packageName, activityName)
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
-                }
-            } else {
-                packageManager.getLaunchIntentForPackage(packageName)?.apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
-                }
-            }
+    fun launchApp(
+        packageName: String,
+        activityName: String? = null,
+        launchContext: Context? = null
+    ): Boolean {
+        val starterContext = launchContext ?: context
+        val isActivityContext = starterContext is android.app.Activity
 
-            if (intent != null) {
-                context.startActivity(intent)
-                true
+        fun prepareFlags(intent: Intent) {
+            if (!isActivityContext) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             } else {
-                false
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-        } catch (e: Exception) {
-            false
+            intent.addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
         }
+
+        fun tryStart(intent: Intent): Boolean {
+            prepareFlags(intent)
+            val resolvedPkg = runCatching {
+                intent.component?.packageName ?: intent.resolveActivity(packageManager)?.packageName
+            }.getOrNull()
+            if (com.example.service.KendrikaranaStateHolder.isKendrikaranaActive() &&
+                com.example.service.KendrikaranaStateHolder.isPackageAllowed(packageName)
+            ) {
+                com.example.service.KendrikaranaStateHolder.notifyAllowedAppLaunched(packageName)
+                if (!resolvedPkg.isNullOrBlank()) {
+                    com.example.service.KendrikaranaStateHolder.notifyAllowedAppLaunched(resolvedPkg)
+                }
+            }
+            return try {
+                starterContext.startActivity(intent)
+                true
+            } catch (_: Exception) {
+                try {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                    true
+                } catch (_: Exception) {
+                    false
+                }
+            }
+        }
+
+        // 1. Primary: PackageManager.getLaunchIntentForPackage handles default launcher alias accurately
+        val defaultLaunchIntent = runCatching {
+            packageManager.getLaunchIntentForPackage(packageName)
+        }.getOrNull()
+        if (defaultLaunchIntent != null && tryStart(defaultLaunchIntent)) {
+            return true
+        }
+
+        // 2. Fallback: Explicit component intent from cached activityName
+        if (!activityName.isNullOrBlank()) {
+            val explicitIntent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+                setClassName(packageName, activityName)
+            }
+            if (tryStart(explicitIntent)) {
+                return true
+            }
+        }
+
+        // 3. Final Fallback: Dynamically query MAIN/LAUNCHER activity for this package
+        val resolvedActivity = runCatching {
+            val queryIntent = Intent(Intent.ACTION_MAIN, null).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+                setPackage(packageName)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.queryIntentActivities(
+                    queryIntent,
+                    PackageManager.ResolveInfoFlags.of(0L)
+                ).firstOrNull()
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.queryIntentActivities(queryIntent, 0).firstOrNull()
+            }
+        }.getOrNull()
+
+        if (resolvedActivity != null) {
+            val dynamicIntent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+                setClassName(
+                    resolvedActivity.activityInfo.packageName,
+                    resolvedActivity.activityInfo.name
+                )
+            }
+            if (tryStart(dynamicIntent)) {
+                return true
+            }
+        }
+
+        return false
     }
 
     suspend fun toggleFavorite(packageName: String) = withContext(ioDispatcher) {
         val current = preferenceDao.getPreference(packageName)
-        val defaultCategory = guessCategory(packageName, "")
+        val rawLabel = _rawInstalledApps.value.firstOrNull { it.packageName == packageName }?.label ?: ""
+        val defaultCategory = guessCategory(packageName, rawLabel)
         val defaultEssential = defaultCategory == AppCategory.URVARA
         val defaultAllowed = defaultCategory == AppCategory.URVARA
 
@@ -179,10 +252,10 @@ class AppRepository(
 
     suspend fun toggleAllowedInFocus(packageName: String) = withContext(ioDispatcher) {
         val current = preferenceDao.getPreference(packageName)
-        val defaultCategory = guessCategory(packageName, "")
+        val rawLabel = _rawInstalledApps.value.firstOrNull { it.packageName == packageName }?.label ?: ""
+        val defaultCategory = guessCategory(packageName, rawLabel)
         val isCurrentlyUrvara = (current?.customCategory == AppCategory.URVARA.name ||
-                (current?.customCategory == null && defaultCategory == AppCategory.URVARA)) &&
-                (current?.isAllowedInFocus ?: true)
+                (current?.customCategory == null && defaultCategory == AppCategory.URVARA))
 
         setUrvaraAllowed(packageName, !isCurrentlyUrvara)
     }

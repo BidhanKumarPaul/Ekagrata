@@ -16,11 +16,10 @@ class EkagrataAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         val info = AccessibilityServiceInfo().apply {
-            eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or AccessibilityEvent.TYPE_WINDOWS_CHANGED
-            flags = AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS or
-                    AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+            eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+            flags = AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
-            notificationTimeout = 50
+            notificationTimeout = 100
         }
         serviceInfo = info
     }
@@ -59,8 +58,7 @@ class EkagrataAccessibilityService : AccessibilityService() {
         if (event == null) return
         if (!KendrikaranaStateHolder.isKendrikaranaActive()) return
 
-        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
-            event.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             val packageName = event.packageName?.toString() ?: return
             val className = event.className?.toString() ?: ""
             val myPkg = applicationContext.packageName
@@ -79,16 +77,14 @@ class EkagrataAccessibilityService : AccessibilityService() {
                 return
             }
 
-            // Whitelist Ekāgratā itself and active input method keyboards
-            if (packageName == myPkg ||
-                packageName.startsWith("com.android.inputmethod") ||
-                packageName.startsWith("com.google.android.inputmethod")
-            ) {
+            // Whitelist Ekāgratā itself and system/keyboard/permission packages
+            if (packageName == myPkg || KendrikaranaStateHolder.isSystemWhitelistedPackage(packageName)) {
                 return
             }
 
-            // If system UI (and not recents), allow volume/status display
-            if (packageName == "com.android.systemui") {
+            // If an allowed Urvarā app is currently in its launch transition, register its target window and allow it
+            if (KendrikaranaStateHolder.isWithinLaunchGracePeriod()) {
+                KendrikaranaStateHolder.notifyAllowedAppLaunched(packageName)
                 return
             }
 

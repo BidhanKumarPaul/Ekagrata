@@ -63,10 +63,45 @@ jobs:
             exit 1
           fi
 
-      - name: Build Debug APK with Gradle
-        run: ./gradlew assembleDebug --no-daemon
+      - name: Build Release & Debug APKs with Gradle
+        run: ./gradlew assembleRelease assembleDebug --no-daemon
 
-      - name: Upload Debug APK Artifact
+      - name: Sign Release APK (Play Protect Compliant Non-Debuggable Build)
+        run: |
+          RELEASE_UNSIGNED="app/build/outputs/apk/release/app-release-unsigned.apk"
+          RELEASE_ALIGNED="app/build/outputs/apk/debug/Ekagrata-Release.apk"
+
+          if [ -f "$RELEASE_UNSIGNED" ]; then
+            # Generate dedicated release keystore if not present
+            keytool -genkeypair -v \
+              -keystore release.keystore \
+              -storepass ekagrata123 \
+              -alias ekagratakey \
+              -keypass ekagrata123 \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Bidhan Kumar Paul, OU=Ekagrata Focus, O=BidhanKumarPaul, C=IN"
+
+            ZIPALIGN=$(find "$ANDROID_HOME/build-tools" -name "zipalign" | sort -V | tail -n 1)
+            APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name "apksigner" | sort -V | tail -n 1)
+
+            if [ -n "$ZIPALIGN" ] && [ -n "$APKSIGNER" ]; then
+              "$ZIPALIGN" -v -p 4 "$RELEASE_UNSIGNED" "$RELEASE_ALIGNED"
+              "$APKSIGNER" sign \
+                --ks release.keystore \
+                --ks-key-alias ekagratakey \
+                --ks-pass pass:ekagrata123 \
+                --key-pass pass:ekagrata123 \
+                --v1-signing-enabled true \
+                --v2-signing-enabled true \
+                --v3-signing-enabled true \
+                "$RELEASE_ALIGNED"
+              echo "Successfully signed Play-Protect-compliant Ekagrata-Release.apk"
+            fi
+          fi
+
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Ekagrata-Debug-APK

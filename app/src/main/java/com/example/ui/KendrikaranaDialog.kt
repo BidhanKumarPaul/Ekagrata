@@ -77,11 +77,15 @@ fun KendrikaranaDialog(
     var selectedDuration by remember { mutableIntStateOf(defaultMinutes) }
     var selectedMode by remember { mutableStateOf(FocusMode.DEEP) }
     val urvaraApps = remember(allApps, allowedApps) {
-        val list = if (allApps.isNotEmpty()) allApps.filter { it.category == AppCategory.URVARA } else allowedApps.filter { it.category == AppCategory.URVARA }
+        val list = if (allApps.isNotEmpty()) {
+            allApps.filter { it.category == AppCategory.URVARA || it.isAllowedInFocus || it.isEssential }
+        } else {
+            allowedApps.filter { it.category == AppCategory.URVARA || it.isAllowedInFocus || it.isEssential }
+        }
         list
     }
     var selectedAllowedPackages by remember(urvaraApps) {
-        mutableStateOf(urvaraApps.filter { it.isAllowedInFocus }.map { it.packageName }.toSet())
+        mutableStateOf(urvaraApps.map { it.packageName }.toSet())
     }
 
     val durations = listOf(15, 25, 45, 50, 90, 120)
@@ -302,7 +306,7 @@ fun KendrikaranaDialog(
                     TextButton(
                         onClick = {
                             selectedAllowedPackages = if (selectedAllowedPackages.isEmpty()) {
-                                allowedApps.map { it.packageName }.toSet()
+                                urvaraApps.map { it.packageName }.toSet()
                             } else {
                                 emptySet()
                             }

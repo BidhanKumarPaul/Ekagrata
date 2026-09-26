@@ -40,5 +40,22 @@ class ExampleUnitTest {
     assertTrue(app.isAllowedInFocus)
     assertFalse(app.isFavorite)
   }
+
+  @Test
+  fun kendrikaranaStateHolder_allowsUrvaraAppLaunchWithoutPullback() {
+    val calcPkg = "com.google.android.calculator"
+    val socialPkg = "com.instagram.android"
+    com.example.service.KendrikaranaStateHolder.setSessionActive(true, setOf(calcPkg))
+
+    assertTrue(com.example.service.KendrikaranaStateHolder.isPackageAllowed(calcPkg))
+    assertFalse(com.example.service.KendrikaranaStateHolder.isPackageAllowed(socialPkg))
+
+    com.example.service.KendrikaranaStateHolder.notifyAllowedAppLaunched(calcPkg)
+    assertTrue(com.example.service.KendrikaranaStateHolder.isInAllowedAppSession())
+    assertTrue(com.example.service.KendrikaranaStateHolder.isWithinLaunchGracePeriod())
+
+    com.example.service.KendrikaranaStateHolder.setSessionActive(false, emptySet())
+    assertFalse(com.example.service.KendrikaranaStateHolder.isInAllowedAppSession())
+  }
 }
 

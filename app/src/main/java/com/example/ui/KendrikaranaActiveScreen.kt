@@ -383,7 +383,51 @@ fun KendrikaranaActiveScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 // Strict Lockout vs Urvarā Section: Allowed Apps Tray in Kendrīkaraṇa mode
-                if (isStrictMode) {
+                if (allowedApps.isNotEmpty()) {
+                    Text(
+                        text = "URVARĀ (ALLOWED APPS)",
+                        style = MaterialTheme.typography.labelSmall,
+                        letterSpacing = 1.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        items(allowedApps, key = { it.packageName }) { app ->
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .width(60.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { onAppClick(app) }
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                AppIconView(
+                                    packageName = app.packageName,
+                                    label = app.label,
+                                    category = app.category,
+                                    size = 48.dp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = app.label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+                } else if (isStrictMode) {
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -412,48 +456,6 @@ fun KendrikaranaActiveScreen(
                             )
                         }
                     }
-                } else if (allowedApps.isNotEmpty()) {
-                    Text(
-                        text = "URVARĀ (ALLOWED APPS)",
-                        style = MaterialTheme.typography.labelSmall,
-                        letterSpacing = 1.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp)
-                    ) {
-                        items(allowedApps, key = { it.packageName }) { app ->
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier
-                                    .width(60.dp)
-                                    .clickable { onAppClick(app) }
-                            ) {
-                                AppIconView(
-                                    packageName = app.packageName,
-                                    label = app.label,
-                                    category = app.category,
-                                    size = 48.dp
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = app.label,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(18.dp))
                 }
 
                 // Controls: Pause / Resume & Emergency Exit

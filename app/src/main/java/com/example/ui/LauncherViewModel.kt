@@ -88,6 +88,7 @@ private data class UiControls(
     val isSettingsOpen: Boolean = false,
     val isCreateGoalOpen: Boolean = false,
     val activeSession: ActiveSessionState = ActiveSessionState.Idle,
+    val sessionAllowedPackages: Set<String>? = null,
     val blockedAppWarning: AppInfo? = null,
     val showEndEarlyConfirmation: Boolean = false
 )
@@ -171,8 +172,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         }
 
         val favorites = data.apps.filter { it.isFavorite }
-        val essentials = data.apps.filter { it.category == AppCategory.URVARA }
-        val allowed = data.apps.filter { it.category == AppCategory.URVARA && it.isAllowedInFocus }
+        val essentials = data.apps.filter { it.category == AppCategory.URVARA || it.isAllowedInFocus || it.isEssential }
+        val allowed = if (controls.sessionAllowedPackages != null && controls.activeSession is ActiveSessionState.Active) {
+            essentials.filter { controls.sessionAllowedPackages.contains(it.packageName) }
+        } else {
+            essentials
+        }
 
         LauncherUiState(
             searchQuery = controls.searchQuery,
@@ -279,7 +284,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun onAppClicked(context: Context, app: AppInfo) {
         val currentSession = uiControls.value.activeSession
         if (currentSession is ActiveSessionState.Active) {
-            val isUrvaraApp = app.category == AppCategory.URVARA && app.isAllowedInFocus
+            val isUrvaraApp = app.category == AppCategory.URVARA ||
+                    app.isAllowedInFocus ||
+                    app.isEssential ||
+                    KendrikaranaStateHolder.isPackageAllowed(app.packageName)
             if (!isUrvaraApp) {
                 // Strictly block all non-Urvarā apps during Kendrīkaraṇa
                 uiControls.update { it.copy(blockedAppWarning = app) }
@@ -287,8 +295,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             }
             // Only genuine allowed Urvarā apps are permitted to be used in Kendrīkaraṇa mode
             isLaunchingAllowedApp = true
+            KendrikaranaStateHolder.notifyAllowedAppLaunched(app.packageName)
         }
-        appRepository.launchApp(app.packageName, app.activityName)
+        appRepository.launchApp(app.packageName, app.activityName, context)
     }
 
     fun confirmLaunchBlockedApp(context: Context, app: AppInfo) {
@@ -332,13 +341,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             MindfulChimeHelper.playStartChime()
         }
 
-        if (sessionAllowedPackageNames != null) {
-            viewModelScope.launch {
-                appRepository.setAllowedApps(sessionAllowedPackageNames, uiState.value.allApps)
-            }
-        }
+        val allUrvaraPkgs = uiState.value.allApps
+            .filter { it.category == AppCategory.URVARA || it.isAllowedInFocus || it.isEssential }
+            .map { it.packageName }
+            .toSet()
+        val allowedPkgs = sessionAllowedPackageNames ?: allUrvaraPkgs
 
-        val allowedPkgs = sessionAllowedPackageNames ?: uiState.value.allowedFocusApps.map { it.packageName }.toSet()
         // Activate system-wide key event consumption and strict usage stats blocker
         KendrikaranaStateHolder.setSessionActive(true, allowedPkgs)
         usageStatsBlockerManager.startMonitoring()
@@ -354,6 +362,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                     isPaused = false,
                     interruptionsAvoided = 0
                 ),
+                sessionAllowedPackages = allowedPkgs,
                 isKendrikaranaSetupOpen = false,
                 isAppDrawerOpen = false,
                 isSettingsOpen = false,

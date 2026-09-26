@@ -69,12 +69,12 @@ class UsageStatsBlockerManager(private val context: Context) {
     fun startMonitoring() {
         stopMonitoring()
         monitorJob = scope.launch {
-            var lastQueryTime = System.currentTimeMillis() - 5000L
+            var lastQueryTime = System.currentTimeMillis()
             while (isActive && KendrikaranaStateHolder.isKendrikaranaActive()) {
+                delay(350)
                 val currentTime = System.currentTimeMillis()
                 checkAndBlockDisallowedApps(lastQueryTime, currentTime)
                 lastQueryTime = currentTime
-                delay(300) // Poll every 300ms for fast blocking response
             }
         }
     }
@@ -97,30 +97,21 @@ class UsageStatsBlockerManager(private val context: Context) {
             }
         }
 
-        // Fallback: If queryEvents did not report, inspect top app from recent usage stats
-        if (latestForegroundPackage == null) {
-            val stats = manager.queryUsageStats(
-                UsageStatsManager.INTERVAL_DAILY,
-                startTime - 60000L,
-                endTime
-            )
-            val topApp = stats?.maxByOrNull { it.lastTimeUsed }
-            if (topApp != null && (endTime - topApp.lastTimeUsed) < 2000L) {
-                latestForegroundPackage = topApp.packageName
-            }
-        }
-
         if (latestForegroundPackage != null) {
             val myPackage = context.packageName
-            if (latestForegroundPackage != myPackage &&
-                latestForegroundPackage != "com.android.systemui" &&
-                !latestForegroundPackage.startsWith("com.android.inputmethod") &&
-                !latestForegroundPackage.startsWith("com.google.android.inputmethod")
-            ) {
-                // If this is a non-Urvarā app, strictly block it!
-                if (!KendrikaranaStateHolder.isPackageAllowed(latestForegroundPackage)) {
-                    KendrikaranaStateHolder.triggerEndKendrikarana(context, latestForegroundPackage)
-                }
+            if (latestForegroundPackage == myPackage) {
+                return
+            }
+            if (KendrikaranaStateHolder.isSystemWhitelistedPackage(latestForegroundPackage)) {
+                return
+            }
+            if (KendrikaranaStateHolder.isWithinLaunchGracePeriod()) {
+                KendrikaranaStateHolder.notifyAllowedAppLaunched(latestForegroundPackage)
+                return
+            }
+            // If this is a non-Urvarā app, strictly block it!
+            if (!KendrikaranaStateHolder.isPackageAllowed(latestForegroundPackage)) {
+                KendrikaranaStateHolder.triggerEndKendrikarana(context, latestForegroundPackage)
             }
         }
     }
