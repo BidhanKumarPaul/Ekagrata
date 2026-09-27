@@ -19,7 +19,7 @@
 
 **Ekagrata (एकाग्रता)** — *a state of single-minded focus* — is an Android launcher built to replace your distracting home screen with a mindful, goal-driven interface. Instead of an endless grid of tempting apps, Ekagrata gives you **one active goal**, a **focus timer**, and a **hard shield** against everything that isn't relevant to what you're trying to do.
 
-> Built solo by [Bidhan Kumar Pal](https://github.com/BidhanKumarPaul) under the **BKP IT** banner.
+> Built solo by [Bidhan Kumar Paul](https://github.com/BidhanKumarPaul) under the **BKP IT** banner.
 
 ---
 
